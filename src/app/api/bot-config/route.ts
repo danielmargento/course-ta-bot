@@ -3,17 +3,26 @@ import { createServerClient } from "@/lib/supabaseServer";
 
 export async function GET(req: NextRequest) {
   const courseId = req.nextUrl.searchParams.get("course_id");
+  if (!courseId) {
+    return NextResponse.json({ error: "course_id is required" }, { status: 400 });
+  }
+
   const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let query = supabase.from("assignments").select("*").order("created_at", { ascending: false });
-  if (courseId) query = query.eq("course_id", courseId);
+  const { data, error } = await supabase
+    .from("bot_configs")
+    .select("*")
+    .eq("course_id", courseId)
+    .single();
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error && error.code !== "PGRST116") {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   return NextResponse.json(data);
 }
 
@@ -36,18 +45,19 @@ export async function POST(req: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from("assignments")
-    .insert({
-      course_id: body.course_id,
-      title: body.title,
-      prompt: body.prompt,
-      staff_notes: body.staff_notes ?? "",
-      faq: body.faq ?? [],
-      overrides: body.overrides ?? null,
-    })
+    .from("bot_configs")
+    .upsert(
+      {
+        course_id: body.course_id,
+        style_preset: body.style_preset,
+        policy: body.policy,
+        context: body.context,
+      },
+      { onConflict: "course_id" }
+    )
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json(data, { status: 200 });
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createServerClient } from "@/lib/supabaseServer";
 import { buildSystemPrompt } from "@/lib/prompt";
-import { isDisallowedRequest } from "@/lib/policy";
+import { isDisallowedRequest, checkTopicGate } from "@/lib/policy";
 import { Course, BotConfig, Assignment, Message } from "@/lib/types";
 
 function getOpenAI() {
@@ -12,7 +12,23 @@ function getOpenAI() {
 export async function POST(req: NextRequest) {
   const { session_id, course_id, assignment_id, message } = await req.json();
 
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Verify user owns the session
+  if (session_id) {
+    const { data: session } = await supabase
+      .from("sessions")
+      .select("student_id")
+      .eq("id", session_id)
+      .single();
+    if (!session || session.student_id !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   // Fetch course
   const { data: course } = await supabase
@@ -47,10 +63,26 @@ export async function POST(req: NextRequest) {
     assignment = data;
   }
 
-  // Check policy
+  // Check policy — disallowed artifacts
   const policyCheck = isDisallowedRequest(message, config.policy);
   if (policyCheck.blocked) {
     return NextResponse.json({ role: "assistant", content: policyCheck.reason });
+  }
+
+  // Check policy — topic gates
+  if (config.policy.topic_gates && config.policy.topic_gates.length > 0) {
+    const lowerMessage = message.toLowerCase();
+    for (const gate of config.policy.topic_gates) {
+      if (lowerMessage.includes(gate.topic.toLowerCase())) {
+        const result = checkTopicGate(gate.topic, config.policy.topic_gates);
+        if (result.gated) {
+          return NextResponse.json({
+            role: "assistant",
+            content: result.gate?.message || config.policy.refusal_message,
+          });
+        }
+      }
+    }
   }
 
   // Fetch prior messages for context

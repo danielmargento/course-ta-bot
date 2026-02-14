@@ -12,7 +12,7 @@ export default function CourseHeader({ course }: Props) {
       <h1 className="text-2xl font-bold">
         {course.code}: {course.name}
       </h1>
-      {course.description && <p className="text-gray-600 mt-1">{course.description}</p>}
+      {course.description && <p className="text-muted mt-1">{course.description}</p>}
     </div>
   );
 }

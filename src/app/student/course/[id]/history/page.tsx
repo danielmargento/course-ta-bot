@@ -31,7 +31,7 @@ export default function SessionHistoryPage() {
           {sessions.map((s) => (
             <Link
               key={s.id}
-              href={`/student/course/${courseId}`}
+              href={`/student/course/${courseId}?session=${s.id}`}
               className="block bg-surface border border-border rounded-lg p-4 hover:border-accent/40 transition-all"
             >
               <span className="font-medium text-foreground text-sm">{s.title}</span>
