@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useUser } from "@/hooks/useUser";
+import PigeonHero from "@/components/landing/PigeonHero";
 
 export default function HomePage() {
   const { user, role, loading } = useUser();
@@ -135,11 +136,9 @@ export default function HomePage() {
         </div>
 
         <div className="text-center relative z-10">
-          <img
-            src="/logo.png"
-            alt="pigeonhole"
-            className="h-80 w-80 object-contain mx-auto mb-6"
-          />
+          <div className="flex justify-center mb-6">
+            <PigeonHero />
+          </div>
           <h1 className="text-5xl font-bold text-foreground mb-3 tracking-tight">
             pigeonhole
           </h1>
