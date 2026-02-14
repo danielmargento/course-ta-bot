@@ -9,9 +9,10 @@ interface Props {
   basePath: string;
   showClassCode?: boolean;
   onDelete?: (id: string) => void;
+  onLeave?: (id: string) => void;
 }
 
-export default function CourseCard({ course, basePath, showClassCode, onDelete }: Props) {
+export default function CourseCard({ course, basePath, showClassCode, onDelete, onLeave }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [confirmText, setConfirmText] = useState("");
 
@@ -39,7 +40,7 @@ export default function CourseCard({ course, basePath, showClassCode, onDelete }
         )}
       </Link>
 
-      {onDelete && !confirming && (
+      {(onDelete || onLeave) && !confirming && (
         <button
           onClick={(e) => {
             e.preventDefault();
@@ -47,11 +48,11 @@ export default function CourseCard({ course, basePath, showClassCode, onDelete }
           }}
           className="absolute top-3 right-3 text-muted hover:text-red-500 text-xs transition-colors opacity-0 group-hover:opacity-100"
         >
-          Delete
+          {onLeave ? "Leave" : "Delete"}
         </button>
       )}
 
-      {confirming && (
+      {confirming && onDelete && (
         <div className="mt-3 pt-3 border-t border-border" onClick={(e) => e.preventDefault()}>
           <p className="text-xs text-muted mb-2">
             Type <span className="font-semibold text-foreground">{course.name}</span> to confirm deletion:
@@ -66,7 +67,7 @@ export default function CourseCard({ course, basePath, showClassCode, onDelete }
             />
             <button
               onClick={() => {
-                if (confirmText === course.name) onDelete?.(course.id);
+                if (confirmText === course.name) onDelete(course.id);
               }}
               disabled={confirmText !== course.name}
               className="px-2 py-1 text-xs rounded bg-red-500 text-white disabled:opacity-30 transition-opacity"
@@ -75,6 +76,26 @@ export default function CourseCard({ course, basePath, showClassCode, onDelete }
             </button>
             <button
               onClick={() => { setConfirming(false); setConfirmText(""); }}
+              className="px-2 py-1 text-xs text-muted hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirming && onLeave && (
+        <div className="mt-3 pt-3 border-t border-border" onClick={(e) => e.preventDefault()}>
+          <p className="text-xs text-muted mb-2">Leave this course?</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onLeave(course.id)}
+              className="px-2 py-1 text-xs rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+            >
+              Leave
+            </button>
+            <button
+              onClick={() => { setConfirming(false); }}
               className="px-2 py-1 text-xs text-muted hover:text-foreground"
             >
               Cancel

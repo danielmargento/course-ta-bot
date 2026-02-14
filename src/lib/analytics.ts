@@ -20,16 +20,25 @@ export function aggregateInsights(
   messages: Message[],
   assignments: Assignment[]
 ): UsageInsight {
-  // Count sessions per assignment
-  const assignmentCounts = new Map<string, number>();
+  // Build session → assignment_id lookup
+  const sessionAssignment = new Map<string, string>();
   for (const s of sessions) {
     if (s.assignment_id) {
-      assignmentCounts.set(s.assignment_id, (assignmentCounts.get(s.assignment_id) ?? 0) + 1);
+      sessionAssignment.set(s.id, s.assignment_id);
+    }
+  }
+
+  // Count messages per assignment
+  const assignmentMsgCounts = new Map<string, number>();
+  for (const m of messages) {
+    const assignmentId = sessionAssignment.get(m.session_id);
+    if (assignmentId) {
+      assignmentMsgCounts.set(assignmentId, (assignmentMsgCounts.get(assignmentId) ?? 0) + 1);
     }
   }
 
   const assignmentMap = new Map(assignments.map((a) => [a.id, a.title]));
-  const top_assignments = Array.from(assignmentCounts.entries())
+  const top_assignments = Array.from(assignmentMsgCounts.entries())
     .map(([assignment_id, count]) => ({
       assignment_id,
       title: assignmentMap.get(assignment_id) ?? "Unknown",
@@ -62,11 +71,15 @@ export function aggregateInsights(
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+  const avg_messages_per_session =
+    sessions.length > 0 ? Math.round((messages.length / sessions.length) * 10) / 10 : 0;
+
   return {
     course_id: courseId,
     top_topics,
     top_assignments,
     total_sessions: sessions.length,
     total_messages: messages.length,
+    avg_messages_per_session,
   };
 }

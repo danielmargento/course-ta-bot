@@ -77,7 +77,9 @@ export async function POST(req: NextRequest) {
       prompt: body.prompt,
       staff_notes: body.staff_notes ?? "",
       faq: body.faq ?? [],
+      style_preset: body.style_preset ?? "socratic",
       overrides: body.overrides ?? null,
+      material_ids: body.material_ids ?? [],
     })
     .select()
     .single();

@@ -1,56 +1,81 @@
 "use client";
 
-import { useState } from "react";
-import { PolicyConfig } from "@/lib/types";
+import { useMemo, useState } from "react";
+import { CourseMaterial, PolicyConfig, StylePreset } from "@/lib/types";
+import { stylePresets } from "@/config/stylePresets";
 
 interface Props {
+  materials?: CourseMaterial[];
   onSave: (assignment: {
     title: string;
     prompt: string;
     staff_notes: string;
     faq: string[];
+    style_preset: StylePreset;
     overrides: Partial<PolicyConfig> | null;
+    material_ids: string[];
   }) => void;
 }
 
-export default function AssignmentEditor({ onSave }: Props) {
+export default function AssignmentEditor({ materials = [], onSave }: Props) {
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [staffNotes, setStaffNotes] = useState("");
   const [faq, setFaq] = useState("");
-  const [showOverrides, setShowOverrides] = useState(false);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [stylePreset, setStylePreset] = useState<StylePreset>("socratic");
 
-  // Override toggles — undefined means "use course default"
-  const [allowFinalAnswers, setAllowFinalAnswers] = useState<boolean | undefined>(undefined);
-  const [allowFullCode, setAllowFullCode] = useState<boolean | undefined>(undefined);
-  const [requireAttemptFirst, setRequireAttemptFirst] = useState<boolean | undefined>(undefined);
-  const [hintLevels, setHintLevels] = useState<number | undefined>(undefined);
+  // Policy controls
+  const [allowFinalAnswers, setAllowFinalAnswers] = useState(false);
+  const [allowFullCode, setAllowFullCode] = useState(false);
+  const [requireAttemptFirst, setRequireAttemptFirst] = useState(true);
+  const [hintLevels, setHintLevels] = useState(3);
+  const [refusalMessage, setRefusalMessage] = useState("");
+
+  // Group materials by category
+  const materialsByCategory = useMemo(() => {
+    const groups: Record<string, CourseMaterial[]> = {};
+    for (const m of materials) {
+      const cat = m.category || "Uncategorized";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(m);
+    }
+    return groups;
+  }, [materials]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const overrides: Partial<PolicyConfig> = {};
-    if (allowFinalAnswers !== undefined) overrides.allow_final_answers = allowFinalAnswers;
-    if (allowFullCode !== undefined) overrides.allow_full_code = allowFullCode;
-    if (requireAttemptFirst !== undefined) overrides.require_attempt_first = requireAttemptFirst;
-    if (hintLevels !== undefined) overrides.hint_levels = hintLevels;
+    const overrides: Partial<PolicyConfig> = {
+      allow_final_answers: allowFinalAnswers,
+      allow_full_code: allowFullCode,
+      require_attempt_first: requireAttemptFirst,
+      hint_levels: hintLevels,
+    };
+    if (refusalMessage.trim()) {
+      overrides.refusal_message = refusalMessage.trim();
+    }
 
     onSave({
       title,
       prompt,
       staff_notes: staffNotes,
       faq: faq.split("\n").map((l) => l.trim()).filter(Boolean),
-      overrides: Object.keys(overrides).length > 0 ? overrides : null,
+      style_preset: stylePreset,
+      overrides,
+      material_ids: selectedMaterialIds,
     });
     setTitle("");
     setPrompt("");
     setStaffNotes("");
     setFaq("");
-    setShowOverrides(false);
-    setAllowFinalAnswers(undefined);
-    setAllowFullCode(undefined);
-    setRequireAttemptFirst(undefined);
-    setHintLevels(undefined);
+    setSelectedMaterialIds([]);
+    setStylePreset("socratic");
+    setAllowFinalAnswers(false);
+    setAllowFullCode(false);
+    setRequireAttemptFirst(true);
+    setHintLevels(3);
+    setRefusalMessage("");
   };
 
   return (
@@ -64,6 +89,29 @@ export default function AssignmentEditor({ onSave }: Props) {
           required
         />
       </div>
+
+      {/* Style Preset */}
+      <div>
+        <label className="text-xs font-medium text-muted block mb-1">Teaching Style</label>
+        <div className="grid grid-cols-2 gap-2">
+          {stylePresets.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setStylePreset(p.key)}
+              className={`text-left border rounded-lg p-3 transition-all text-sm ${
+                stylePreset === p.key
+                  ? "border-accent bg-accent-light"
+                  : "border-border hover:border-accent/40"
+              }`}
+            >
+              <span className="font-medium text-foreground">{p.label}</span>
+              <p className="text-xs text-muted mt-0.5">{p.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div>
         <label className="text-xs font-medium text-muted block mb-1">Prompt</label>
         <textarea
@@ -95,67 +143,119 @@ export default function AssignmentEditor({ onSave }: Props) {
         />
       </div>
 
-      {/* Per-assignment policy overrides */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowOverrides(!showOverrides)}
-          className="text-xs text-accent hover:underline"
-        >
-          {showOverrides ? "Hide" : "Show"} policy overrides for this assignment
-        </button>
-      </div>
-
-      {showOverrides && (
-        <div className="border border-border rounded-lg p-4 bg-background space-y-3">
-          <p className="text-xs text-muted">
-            Override course-level defaults for this assignment. Leave unchecked to use course defaults.
-          </p>
-          <TriStateToggle
-            label="Allow final answers"
-            value={allowFinalAnswers}
-            onChange={setAllowFinalAnswers}
-          />
-          <TriStateToggle
-            label="Allow full code solutions"
-            value={allowFullCode}
-            onChange={setAllowFullCode}
-          />
-          <TriStateToggle
-            label="Require student attempt first"
-            value={requireAttemptFirst}
-            onChange={setRequireAttemptFirst}
-          />
-          <div>
-            <label className="text-xs text-muted block mb-1">
-              Hint levels override
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={hintLevels !== undefined}
-                onChange={(e) => setHintLevels(e.target.checked ? 3 : undefined)}
-                className="accent-accent"
-              />
-              {hintLevels !== undefined ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    value={hintLevels}
-                    onChange={(e) => setHintLevels(parseInt(e.target.value))}
-                    className="flex-1 accent-accent"
-                  />
-                  <span className="text-xs text-foreground font-medium w-4">{hintLevels}</span>
+      {/* Materials selector grouped by category */}
+      {materials.length > 0 && (
+        <div>
+          <label className="text-xs font-medium text-muted block mb-1">
+            Relevant Materials <span className="text-muted/60">(select which materials apply)</span>
+          </label>
+          <div className="border border-border rounded-lg p-3 bg-background space-y-3 max-h-64 overflow-y-auto">
+            {Object.entries(materialsByCategory).map(([category, categoryMaterials]) => {
+              const allSelected = categoryMaterials.every((m) => selectedMaterialIds.includes(m.id));
+              return (
+                <div key={category}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                      {category}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (allSelected) {
+                          setSelectedMaterialIds(
+                            selectedMaterialIds.filter((id) => !categoryMaterials.some((m) => m.id === id))
+                          );
+                        } else {
+                          const newIds = new Set([...selectedMaterialIds, ...categoryMaterials.map((m) => m.id)]);
+                          setSelectedMaterialIds([...newIds]);
+                        }
+                      }}
+                      className="text-[10px] text-accent hover:underline"
+                    >
+                      {allSelected ? "Deselect all" : "Select all"}
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {categoryMaterials.map((m) => (
+                      <label key={m.id} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedMaterialIds.includes(m.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedMaterialIds([...selectedMaterialIds, m.id]);
+                            } else {
+                              setSelectedMaterialIds(selectedMaterialIds.filter((id) => id !== m.id));
+                            }
+                          }}
+                          className="accent-accent"
+                        />
+                        {m.file_name}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <span className="text-xs text-muted">Using course default</span>
-              )}
-            </div>
+              );
+            })}
           </div>
         </div>
       )}
+
+      {/* Policy Controls */}
+      <div className="border border-border rounded-lg p-4 bg-background space-y-3">
+        <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">Policy</h4>
+        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowFinalAnswers}
+            onChange={(e) => setAllowFinalAnswers(e.target.checked)}
+            className="accent-accent"
+          />
+          Allow final answers
+        </label>
+        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowFullCode}
+            onChange={(e) => setAllowFullCode(e.target.checked)}
+            className="accent-accent"
+          />
+          Allow full code solutions
+        </label>
+        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={requireAttemptFirst}
+            onChange={(e) => setRequireAttemptFirst(e.target.checked)}
+            className="accent-accent"
+          />
+          Require student attempt first
+        </label>
+        <div>
+          <label className="text-xs text-muted block mb-1">Hint levels</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={hintLevels}
+              onChange={(e) => setHintLevels(parseInt(e.target.value))}
+              className="flex-1 accent-accent"
+            />
+            <span className="text-xs text-foreground font-medium w-4">{hintLevels}</span>
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">Refusal message</label>
+          <textarea
+            className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
+            rows={2}
+            value={refusalMessage}
+            onChange={(e) => setRefusalMessage(e.target.value)}
+            placeholder="Custom message when the bot declines to answer..."
+          />
+        </div>
+      </div>
 
       <button
         type="submit"
@@ -164,39 +264,5 @@ export default function AssignmentEditor({ onSave }: Props) {
         Add Assignment
       </button>
     </form>
-  );
-}
-
-function TriStateToggle({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean | undefined;
-  onChange: (v: boolean | undefined) => void;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <input
-        type="checkbox"
-        checked={value !== undefined}
-        onChange={(e) => onChange(e.target.checked ? false : undefined)}
-        className="accent-accent"
-      />
-      {value !== undefined ? (
-        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            checked={value}
-            onChange={(e) => onChange(e.target.checked)}
-            className="accent-accent"
-          />
-          {label}
-        </label>
-      ) : (
-        <span className="text-xs text-muted">{label} — using course default</span>
-      )}
-    </div>
   );
 }

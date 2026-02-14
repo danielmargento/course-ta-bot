@@ -97,7 +97,15 @@ export default function StudentCoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {courses.map((c) => (
-            <CourseCard key={c.id} course={c} basePath="/student/course" />
+            <CourseCard
+              key={c.id}
+              course={c}
+              basePath="/student/course"
+              onLeave={async (id) => {
+                const res = await fetch(`/api/enroll?course_id=${id}`, { method: "DELETE" });
+                if (res.ok) setCourses((prev) => prev.filter((x) => x.id !== id));
+              }}
+            />
           ))}
         </div>
       )}

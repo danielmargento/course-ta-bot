@@ -6,7 +6,7 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import ChatComposer from "@/components/chat/ChatComposer";
 import AssignmentSelect from "@/components/assignments/AssignmentSelect";
 import ExportButton from "@/components/pdf/ExportButton";
-import { Assignment, Message } from "@/lib/types";
+import { Announcement, Assignment, Message } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
 
 export default function StudentCoursePage() {
@@ -21,12 +21,36 @@ export default function StudentCoursePage() {
   const [streaming, setStreaming] = useState(false);
   const sessionIdRef = useRef<string | null>(resumeSessionId);
   const isNewSessionRef = useRef(true);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [showAnnouncements, setShowAnnouncements] = useState(true);
 
   // Load assignments
   useEffect(() => {
     fetch(`/api/assignments?course_id=${courseId}`)
       .then((r) => r.json())
       .then(setAssignments)
+      .catch(() => {});
+  }, [courseId]);
+
+  // Load announcements
+  useEffect(() => {
+    fetch(`/api/announcements?course_id=${courseId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setAnnouncements(data);
+          // Mark unviewed ones as viewed
+          data.forEach((a: Announcement) => {
+            if (!a.viewed) {
+              fetch("/api/announcements/view", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ announcement_id: a.id }),
+              });
+            }
+          });
+        }
+      })
       .catch(() => {});
   }, [courseId]);
 
@@ -197,8 +221,45 @@ export default function StudentCoursePage() {
     );
   }
 
+  const unviewedCount = announcements.filter((a) => !a.viewed).length;
+
   return (
     <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-120px)]">
+      {announcements.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowAnnouncements(!showAnnouncements)}
+            className="text-xs text-accent hover:underline mb-2"
+          >
+            {showAnnouncements ? "Hide" : "Show"} announcements ({announcements.length})
+            {unviewedCount > 0 && !showAnnouncements && (
+              <span className="ml-1 bg-accent text-white px-1.5 py-0.5 rounded-full text-[10px]">
+                {unviewedCount} new
+              </span>
+            )}
+          </button>
+          {showAnnouncements && (
+            <div className="space-y-2">
+              {announcements.map((a) => (
+                <div
+                  key={a.id}
+                  className={`p-3 border rounded-lg text-sm ${
+                    a.viewed
+                      ? "bg-background border-border"
+                      : "bg-accent-light border-accent/20"
+                  }`}
+                >
+                  <p className="text-foreground whitespace-pre-wrap">{a.content}</p>
+                  <span className="text-xs text-muted mt-1 block">
+                    {new Date(a.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <AssignmentSelect

@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { createServerClient } from "@/lib/supabaseServer";
 import { buildSystemPrompt } from "@/lib/prompt";
 import { isDisallowedRequest, checkTopicGate } from "@/lib/policy";
-import { Course, BotConfig, Assignment, Message } from "@/lib/types";
+import { Course, BotConfig, Assignment, CourseMaterial, Message } from "@/lib/types";
 
 function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
@@ -63,6 +63,24 @@ export async function POST(req: NextRequest) {
     assignment = data;
   }
 
+  // Fetch relevant materials
+  let materials: CourseMaterial[] = [];
+  if (assignment?.material_ids && assignment.material_ids.length > 0) {
+    // Assignment-specific: only selected materials
+    const { data: matData } = await supabase
+      .from("course_materials")
+      .select("*")
+      .in("id", assignment.material_ids);
+    materials = matData ?? [];
+  } else {
+    // General chat (no assignment or no materials selected): all course materials
+    const { data: matData } = await supabase
+      .from("course_materials")
+      .select("*")
+      .eq("course_id", course_id);
+    materials = matData ?? [];
+  }
+
   // Merge assignment-level policy overrides into course-level policy
   const effectivePolicy = assignment?.overrides
     ? { ...config.policy, ...assignment.overrides }
@@ -98,8 +116,12 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true })
     .returns<Message[]>();
 
-  const effectiveConfig = { ...config, policy: effectivePolicy };
-  const systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment);
+  const effectiveConfig = {
+    ...config,
+    policy: effectivePolicy,
+    style_preset: assignment?.style_preset ?? config.style_preset,
+  };
+  const systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment, materials);
 
   const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },

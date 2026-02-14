@@ -1,11 +1,12 @@
-import { Assignment, BotConfig, Course } from "./types";
+import { Assignment, BotConfig, Course, CourseMaterial } from "./types";
 import { buildPolicyInstructions } from "./policy";
 import { getPresetConfig } from "@/config/stylePresets";
 
 export function buildSystemPrompt(
   course: Course,
   config: BotConfig,
-  assignment?: Assignment | null
+  assignment?: Assignment | null,
+  materials?: CourseMaterial[]
 ): string {
   const sections: string[] = [];
 
@@ -26,6 +27,17 @@ export function buildSystemPrompt(
   // Course context
   if (config.context) {
     sections.push(`\n## Course Context\n${config.context}`);
+  }
+
+  // Course materials
+  if (materials && materials.length > 0) {
+    const materialTexts = materials
+      .filter((m) => m.extracted_text)
+      .map((m) => `### ${m.file_name}\n${m.extracted_text}`)
+      .join("\n\n");
+    if (materialTexts) {
+      sections.push(`\n## Course Materials\n${materialTexts}`);
+    }
   }
 
   // Assignment context

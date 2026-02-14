@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 
+export async function DELETE(req: NextRequest) {
+  const courseId = req.nextUrl.searchParams.get("course_id");
+  if (!courseId) return NextResponse.json({ error: "course_id is required" }, { status: 400 });
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { error } = await supabase
+    .from("enrollments")
+    .delete()
+    .eq("course_id", courseId)
+    .eq("student_id", user.id);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
 export async function POST(req: NextRequest) {
   const { class_code } = await req.json();
   if (!class_code || typeof class_code !== "string") {

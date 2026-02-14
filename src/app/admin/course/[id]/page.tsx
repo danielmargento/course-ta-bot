@@ -2,51 +2,40 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import PolicyEditor from "@/components/admin/PolicyEditor";
-import StylePresetSelect from "@/components/admin/StylePresetSelect";
-import ContextUploader from "@/components/admin/ContextUploader";
+import MaterialsPanel from "@/components/admin/MaterialsPanel";
 import AssignmentEditor from "@/components/admin/AssignmentEditor";
-import PreviewPanel from "@/components/admin/PreviewPanel";
 import InsightsPanel from "@/components/admin/InsightsPanel";
-import { Assignment, PolicyConfig, StylePreset, UsageInsight } from "@/lib/types";
-import { defaultPolicy } from "@/config/defaultPolicy";
+import RosterPanel from "@/components/admin/RosterPanel";
+import { Announcement, Assignment, CourseMaterial, UsageInsight } from "@/lib/types";
 
-type Tab = "policy" | "context" | "assignments" | "preview" | "insights";
+type Tab = "materials" | "assignments" | "announcements" | "roster" | "insights";
 
 export default function AdminCoursePage() {
   const { id: courseId } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<Tab>("policy");
-  const [policy, setPolicy] = useState<PolicyConfig>(defaultPolicy);
-  const [stylePreset, setStylePreset] = useState<StylePreset>("socratic");
-  const [context, setContext] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("assignments");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [insights, setInsights] = useState<UsageInsight | null>(null);
   const [classCode, setClassCode] = useState("");
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [newAnnouncement, setNewAnnouncement] = useState("");
+  const [posting, setPosting] = useState(false);
 
   // Load course info (for class code)
   useEffect(() => {
     fetch("/api/courses")
       .then((r) => r.json())
       .then((courses) => {
+        if (!Array.isArray(courses)) return;
         const course = courses.find((c: { id: string }) => c.id === courseId);
         if (course) setClassCode(course.class_code ?? "");
       })
       .catch(() => {});
   }, [courseId]);
 
-  // Load bot config on mount
+  // Load bot config on mount (still needed as fallback for general chat)
   useEffect(() => {
-    fetch(`/api/bot-config?course_id=${courseId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && data.course_id) {
-          setPolicy(data.policy ?? defaultPolicy);
-          setStylePreset(data.style_preset ?? "socratic");
-          setContext(data.context ?? "");
-        }
-      })
-      .catch(() => {});
+    fetch(`/api/bot-config?course_id=${courseId}`).catch(() => {});
   }, [courseId]);
 
   // Load assignments
@@ -59,6 +48,27 @@ export default function AdminCoursePage() {
       .catch(() => {});
   }, [courseId]);
 
+  // Load materials
+  useEffect(() => {
+    fetch(`/api/materials?course_id=${courseId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setMaterials(data);
+      })
+      .catch(() => {});
+  }, [courseId]);
+
+  // Load announcements when tab is active
+  useEffect(() => {
+    if (activeTab !== "announcements") return;
+    fetch(`/api/announcements?course_id=${courseId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setAnnouncements(data);
+      })
+      .catch(() => {});
+  }, [activeTab, courseId]);
+
   // Load insights when tab is active
   useEffect(() => {
     if (activeTab !== "insights") return;
@@ -70,29 +80,36 @@ export default function AdminCoursePage() {
       .catch(() => {});
   }, [activeTab, courseId]);
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handlePostAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnnouncement.trim()) return;
+    setPosting(true);
     try {
-      await fetch("/api/bot-config", {
+      const res = await fetch("/api/announcements", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          course_id: courseId,
-          style_preset: stylePreset,
-          policy,
-          context,
-        }),
+        body: JSON.stringify({ course_id: courseId, content: newAnnouncement }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        setAnnouncements((prev) => [data, ...prev]);
+        setNewAnnouncement("");
+      }
     } finally {
-      setSaving(false);
+      setPosting(false);
     }
   };
 
+  const handleDeleteAnnouncement = async (id: string) => {
+    const res = await fetch(`/api/announcements?id=${id}`, { method: "DELETE" });
+    if (res.ok) setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+  };
+
   const tabs: { key: Tab; label: string }[] = [
-    { key: "policy", label: "Policy" },
-    { key: "context", label: "Context" },
+    { key: "materials", label: "Materials" },
     { key: "assignments", label: "Assignments" },
-    { key: "preview", label: "Preview" },
+    { key: "announcements", label: "Announcements" },
+    { key: "roster", label: "Roster" },
     { key: "insights", label: "Insights" },
   ];
 
@@ -115,21 +132,22 @@ export default function AdminCoursePage() {
             </p>
           )}
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        <a
+          href={`/student/course/${courseId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2 border border-border text-sm font-medium rounded-lg text-foreground hover:bg-surface transition-colors"
         >
-          {saving ? "Saving..." : "Save"}
-        </button>
+          See Student View
+        </a>
       </div>
 
-      <div className="flex gap-1 border-b border-border mb-6">
+      <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
               activeTab === t.key
                 ? "border-accent text-accent"
                 : "border-transparent text-muted hover:text-foreground"
@@ -141,18 +159,12 @@ export default function AdminCoursePage() {
       </div>
 
       <div className="bg-surface border border-border rounded-lg p-6">
-        {activeTab === "policy" && (
-          <div className="space-y-6">
-            <p className="text-xs text-muted">
-              These are the default guardrails for your course. Individual assignments can override these settings.
-            </p>
-            <StylePresetSelect value={stylePreset} onChange={setStylePreset} />
-            <hr className="border-border" />
-            <PolicyEditor policy={policy} onChange={setPolicy} />
-          </div>
-        )}
-        {activeTab === "context" && (
-          <ContextUploader context={context} onChange={setContext} />
+        {activeTab === "materials" && (
+          <MaterialsPanel
+            courseId={courseId}
+            materials={materials}
+            onMaterialsChange={setMaterials}
+          />
         )}
         {activeTab === "assignments" && (
           <div className="space-y-6">
@@ -164,6 +176,9 @@ export default function AdminCoursePage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <span className="font-medium text-foreground">{a.title}</span>
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
+                          {a.style_preset}
+                        </span>
                         <p className="text-muted text-xs mt-0.5">{a.prompt.slice(0, 100)}{a.prompt.length > 100 ? "..." : ""}</p>
                       </div>
                       <button
@@ -192,13 +207,13 @@ export default function AdminCoursePage() {
               </div>
             )}
             <AssignmentEditor
+              materials={materials}
               onSave={(a) => {
                 fetch("/api/assignments", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ ...a, course_id: courseId }),
                 }).then(() => {
-                  // Refresh assignments list
                   fetch(`/api/assignments?course_id=${courseId}`)
                     .then((r) => r.json())
                     .then((data) => {
@@ -209,7 +224,56 @@ export default function AdminCoursePage() {
             />
           </div>
         )}
-        {activeTab === "preview" && <PreviewPanel courseId={courseId} />}
+        {activeTab === "announcements" && (
+          <div className="space-y-6">
+            <form onSubmit={handlePostAnnouncement} className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted block mb-1">New Announcement</label>
+                <textarea
+                  className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
+                  rows={3}
+                  value={newAnnouncement}
+                  onChange={(e) => setNewAnnouncement(e.target.value)}
+                  placeholder="Write an announcement for your students..."
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={posting}
+                className="bg-accent text-white px-4 py-2 rounded text-sm font-medium hover:bg-accent-hover transition-colors disabled:opacity-50"
+              >
+                {posting ? "Posting..." : "Post Announcement"}
+              </button>
+            </form>
+
+            {announcements.length > 0 && (
+              <div className="space-y-3">
+                <hr className="border-border" />
+                {announcements.map((a) => (
+                  <div key={a.id} className="p-4 bg-background border border-border rounded-lg">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{a.content}</p>
+                      <button
+                        onClick={() => handleDeleteAnnouncement(a.id)}
+                        className="text-xs text-muted hover:text-red-500 transition-colors shrink-0"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3 mt-3 text-xs text-muted">
+                      <span>{new Date(a.created_at).toLocaleString()}</span>
+                      {a.view_count !== undefined && (
+                        <span>{a.view_count}/{a.total_students} viewed</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === "roster" && <RosterPanel courseId={courseId} />}
         {activeTab === "insights" && <InsightsPanel insights={insights} />}
       </div>
     </div>

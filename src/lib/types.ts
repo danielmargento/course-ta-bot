@@ -21,7 +21,20 @@ export interface Assignment {
   prompt: string;
   staff_notes: string;
   faq: string[];
+  style_preset: StylePreset;
   overrides: Partial<PolicyConfig> | null;
+  material_ids: string[];
+  created_at: string;
+}
+
+export interface CourseMaterial {
+  id: string;
+  course_id: string;
+  file_name: string;
+  file_type: string;
+  category: string;
+  storage_path: string;
+  extracted_text?: string;
   created_at: string;
 }
 
@@ -79,6 +92,25 @@ export interface UsageInsight {
   top_assignments: { assignment_id: string; title: string; count: number }[];
   total_sessions: number;
   total_messages: number;
+  avg_messages_per_session: number;
+}
+
+export interface Announcement {
+  id: string;
+  course_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  view_count?: number;
+  total_students?: number;
+  viewed?: boolean;
+}
+
+export interface RosterStudent {
+  id: string;
+  first_name: string;
+  last_name: string;
+  enrolled_at: string;
 }
 
 export interface Feedback {
