@@ -18,6 +18,13 @@ export default function AdminCoursesPage() {
       .catch(() => {});
   }, []);
 
+  const handleDelete = async (id: string) => {
+    const res = await fetch(`/api/courses?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setCourses((prev) => prev.filter((c) => c.id !== id));
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await fetch("/api/courses", {
@@ -103,7 +110,7 @@ export default function AdminCoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {courses.map((c) => (
-            <CourseCard key={c.id} course={c} basePath="/admin/course" showClassCode />
+            <CourseCard key={c.id} course={c} basePath="/admin/course" showClassCode onDelete={handleDelete} />
           ))}
         </div>
       )}

@@ -157,9 +157,21 @@ export default function AdminCoursePage() {
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-foreground">Existing Assignments</h3>
                 {assignments.map((a) => (
-                  <div key={a.id} className="p-3 bg-background border border-border rounded text-sm">
-                    <span className="font-medium text-foreground">{a.title}</span>
-                    <p className="text-muted text-xs mt-0.5">{a.prompt.slice(0, 100)}{a.prompt.length > 100 ? "..." : ""}</p>
+                  <div key={a.id} className="p-3 bg-background border border-border rounded text-sm flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="font-medium text-foreground">{a.title}</span>
+                      <p className="text-muted text-xs mt-0.5">{a.prompt.slice(0, 100)}{a.prompt.length > 100 ? "..." : ""}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Delete "${a.title}"?`)) return;
+                        const res = await fetch(`/api/assignments?id=${a.id}`, { method: "DELETE" });
+                        if (res.ok) setAssignments((prev) => prev.filter((x) => x.id !== a.id));
+                      }}
+                      className="text-xs text-muted hover:text-red-500 transition-colors shrink-0"
+                    >
+                      Delete
+                    </button>
                   </div>
                 ))}
                 <hr className="border-border" />

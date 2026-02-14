@@ -23,8 +23,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="bg-white border-b border-border px-6 py-3 flex items-center justify-between">
-        <Link href="/" className="font-bold text-lg tracking-tight text-accent">
-          Course TA
+        <Link href="/" className="flex items-center gap-2">
+          <img src="/logo.png" alt="pigeonhole" className="h-8 w-8 object-contain" />
+          <span className="font-bold text-lg tracking-tight text-accent">pigeonhole</span>
         </Link>
         {!isAuthPage && !loading && user && (
           <div className="flex items-center gap-4">

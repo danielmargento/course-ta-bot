@@ -20,7 +20,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Course TA Bot",
+  title: "pigeonhole",
   description: "AI-powered teaching assistant for course-specific, policy-constrained learning",
 };
 

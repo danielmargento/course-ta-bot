@@ -1,24 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useUser } from "@/hooks/useUser";
-import { createClient } from "@/lib/supabaseClient";
 
 export default function HomePage() {
   const router = useRouter();
   const { user, role, loading } = useUser();
-
-  useEffect(() => {
-    if (loading || !user) return;
-
-    if (role === "instructor") {
-      router.push("/admin/courses");
-    } else {
-      router.push("/student/courses");
-    }
-  }, [user, role, loading, router]);
 
   if (loading) {
     return (
@@ -28,37 +15,48 @@ export default function HomePage() {
     );
   }
 
-  if (user) {
-    return (
-      <div className="max-w-xl mx-auto text-center mt-24">
-        <p className="text-muted text-sm">Redirecting...</p>
-      </div>
-    );
-  }
+  const dashboardHref =
+    role === "instructor" ? "/admin/courses" : "/student/courses";
 
   return (
     <div className="max-w-3xl mx-auto px-6">
       {/* Hero */}
-      <section className="text-center pt-16 pb-14">
-        <div className="text-5xl mb-4">🎓</div>
-        <h1 className="text-4xl font-normal text-foreground mb-3">Course TA</h1>
-        <p className="text-lg text-muted max-w-lg mx-auto leading-relaxed">
-          AI teaching assistants that help students learn — not cheat.
-          Instructors set the rules, students get the guidance.
+      <section className="text-center pt-20 pb-14">
+        <img
+          src="/logo.png"
+          alt="pigeonhole"
+          className="h-32 w-32 object-contain mx-auto mb-6"
+        />
+        <h1 className="text-4xl font-bold text-foreground mb-3 tracking-tight">
+          pigeonhole
+        </h1>
+        <p className="text-lg text-muted max-w-md mx-auto leading-relaxed">
+          Your AI teaching assistant that helps students learn — not cheat.
         </p>
         <div className="flex gap-3 justify-center mt-8">
-          <Link
-            href="/signup"
-            className="bg-accent text-white px-6 py-2.5 rounded text-sm hover:bg-accent-hover transition-colors"
-          >
-            Get Started
-          </Link>
-          <Link
-            href="/login"
-            className="border border-border text-foreground px-6 py-2.5 rounded text-sm hover:bg-accent-light transition-colors"
-          >
-            Sign In
-          </Link>
+          {user ? (
+            <Link
+              href={dashboardHref}
+              className="bg-accent text-white px-6 py-2.5 rounded text-sm font-medium hover:bg-accent-hover transition-colors"
+            >
+              Go to My Courses
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/signup"
+                className="bg-accent text-white px-6 py-2.5 rounded text-sm font-medium hover:bg-accent-hover transition-colors"
+              >
+                Get Started
+              </Link>
+              <Link
+                href="/login"
+                className="border border-border text-foreground px-6 py-2.5 rounded text-sm font-medium hover:bg-accent-light transition-colors"
+              >
+                Sign In
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
@@ -70,7 +68,7 @@ export default function HomePage() {
             <div className="text-sm text-accent mb-2">Instructors</div>
             <h3 className="text-base text-foreground mb-1.5">Set the guardrails</h3>
             <p className="text-sm text-muted leading-relaxed">
-              Choose what the bot can and can't reveal — no final answers, no full code,
+              Choose what the bot can and can&apos;t reveal — no final answers, no full code,
               hints only. Pick a teaching style and upload course materials.
             </p>
           </div>
@@ -79,15 +77,15 @@ export default function HomePage() {
             <h3 className="text-base text-foreground mb-1.5">Ask for help</h3>
             <p className="text-sm text-muted leading-relaxed">
               Chat with an AI TA that knows your course, your assignments, and your
-              instructor's policies. Get hints, explanations, and debugging guidance.
+              instructor&apos;s policies. Get hints, explanations, and debugging guidance.
             </p>
           </div>
           <div className="bg-surface border border-border rounded-lg p-5">
             <div className="text-sm text-accent mb-2">Learning</div>
             <h3 className="text-base text-foreground mb-1.5">Scaffolded, not spoon-fed</h3>
             <p className="text-sm text-muted leading-relaxed">
-              The bot guides you step by step — concept checks, targeted hints, "try this
-              next" prompts — so you actually understand the material.
+              The bot guides you step by step — concept checks, targeted hints, &ldquo;try this
+              next&rdquo; prompts — so you actually understand the material.
             </p>
           </div>
         </div>
@@ -99,13 +97,13 @@ export default function HomePage() {
         <div className="max-w-2xl mx-auto space-y-4 text-sm text-muted leading-relaxed">
           <p>
             Students have always used every resource available to them — office hours,
-            study groups, Stack Overflow, and now AI. The problem isn't that students
-            use AI. It's that general-purpose chatbots have no concept of course policy,
-            academic integrity, or pedagogical intent. They'll happily hand over a full
+            study groups, Stack Overflow, and now AI. The problem isn&apos;t that students
+            use AI. It&apos;s that general-purpose chatbots have no concept of course policy,
+            academic integrity, or pedagogical intent. They&apos;ll happily hand over a full
             solution the night before a deadline.
           </p>
           <p>
-            Course TA flips the model. Instead of banning AI and hoping for the best,
+            pigeonhole flips the model. Instead of banning AI and hoping for the best,
             instructors define exactly how the AI should help: which topics are fair game,
             what level of detail is appropriate, and when the bot should push back and
             ask the student to try first. The result is an AI that teaches the way the

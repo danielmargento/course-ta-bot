@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { defaultPolicy } from "@/config/defaultPolicy";
 
+export async function DELETE(req: NextRequest) {
+  const courseId = req.nextUrl.searchParams.get("id");
+  if (!courseId) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Verify the user owns this course
+  const { data: course } = await supabase
+    .from("courses")
+    .select("owner_id")
+    .eq("id", courseId)
+    .single();
+
+  if (!course || course.owner_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { error } = await supabase.from("courses").delete().eq("id", courseId);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
 function generateClassCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
