@@ -24,7 +24,37 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState("other");
   const [dragOver, setDragOver] = useState(false);
+  const [reextracting, setReextracting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleReextract = async (materialId: string) => {
+    setReextracting(materialId);
+    try {
+      const res = await fetch("/api/materials/reextract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ material_id: materialId }),
+      });
+      if (res.ok) {
+        const results = await res.json();
+        const result = results[0];
+        if (result?.status === "success" && result.text_length > 0) {
+          // Refresh materials list to get updated extracted_text
+          const matRes = await fetch(`/api/materials?course_id=${courseId}`);
+          if (matRes.ok) {
+            const updated = await matRes.json();
+            if (Array.isArray(updated)) onMaterialsChange(updated);
+          }
+        } else {
+          setError(`Re-extraction failed for this file: ${result?.error || "no text extracted"}`);
+        }
+      }
+    } catch {
+      setError("Re-extraction failed");
+    } finally {
+      setReextracting(null);
+    }
+  };
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -137,27 +167,46 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
           <h3 className="text-sm font-medium text-foreground">
             Uploaded Materials ({materials.length})
           </h3>
-          {materials.map((m) => (
-            <div key={m.id} className="p-3 bg-background border border-border rounded flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-foreground truncate block">{m.file_name}</span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
-                    {CATEGORIES.find((c) => c.value === m.category)?.label ?? m.category}
-                  </span>
-                  <span className="text-xs text-muted">
-                    {new Date(m.created_at).toLocaleDateString()}
-                  </span>
+          {materials.map((m) => {
+            const hasText = !!(m.extracted_text && m.extracted_text.length > 0);
+            return (
+              <div key={m.id} className="p-3 bg-background border border-border rounded flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground truncate block">{m.file_name}</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
+                      {CATEGORIES.find((c) => c.value === m.category)?.label ?? m.category}
+                    </span>
+                    <span className="text-xs text-muted">
+                      {new Date(m.created_at).toLocaleDateString()}
+                    </span>
+                    {hasText ? (
+                      <span className="text-[10px] text-green-600">Parsed</span>
+                    ) : (
+                      <span className="text-[10px] text-red-500">No text extracted</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!hasText && (
+                    <button
+                      onClick={() => handleReextract(m.id)}
+                      disabled={reextracting === m.id}
+                      className="text-xs text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
+                    >
+                      {reextracting === m.id ? "Extracting..." : "Re-extract"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(m.id)}
+                    className="text-xs text-muted hover:text-red-500 transition-colors"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => handleDelete(m.id)}
-                className="text-xs text-muted hover:text-red-500 transition-colors shrink-0"
-              >
-                Delete
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

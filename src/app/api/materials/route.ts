@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("course_materials")
-    .select("id, course_id, file_name, file_type, category, storage_path, created_at")
+    .select("id, course_id, file_name, file_type, category, storage_path, extracted_text, created_at")
     .eq("course_id", courseId)
     .order("created_at", { ascending: false });
 
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       storage_path: storagePath,
       extracted_text: extractedText,
     })
-    .select("id, course_id, file_name, file_type, category, storage_path, created_at")
+    .select("id, course_id, file_name, file_type, category, storage_path, extracted_text, created_at")
     .single();
 
   if (error) {
