@@ -1,5 +1,4 @@
-// Import from lib directly to avoid pdf-parse's index.js test-file bug
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import JSZip from "jszip";
 
@@ -26,7 +25,8 @@ export async function extractText(
 }
 
 async function extractPdf(buffer: Buffer): Promise<string> {
-  const result = await pdfParse(buffer);
+  const parser = new PDFParse({ data: buffer });
+  const result = await parser.getText();
   return result.text;
 }
 
