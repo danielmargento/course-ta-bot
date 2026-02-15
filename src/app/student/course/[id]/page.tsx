@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import ChatWindow from "@/components/chat/ChatWindow";
 import ChatComposer from "@/components/chat/ChatComposer";
+import PigeonChatBubble from "@/components/chat/PigeonChatBubble";
 import AssignmentSelect from "@/components/assignments/AssignmentSelect";
 import ExportButton from "@/components/pdf/ExportButton";
 import { Announcement, Assignment, Message } from "@/lib/types";
@@ -212,6 +213,8 @@ export default function StudentCoursePage() {
   };
 
   const savedMessages = messages.filter((m) => m.saved);
+  const latestAssistantContent =
+    [...messages].reverse().find((m) => m.role === "assistant")?.content ?? null;
 
   if (userLoading) {
     return (
@@ -304,7 +307,13 @@ export default function StudentCoursePage() {
             </div>
           );
         })()}
-        <ChatComposer onSend={handleSend} disabled={streaming} />
+        <div className="border-t border-border bg-surface">
+          <PigeonChatBubble
+            assistantContent={latestAssistantContent}
+            streaming={streaming}
+          />
+          <ChatComposer onSend={handleSend} disabled={streaming} />
+        </div>
       </div>
     </div>
   );
