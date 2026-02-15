@@ -1,4 +1,5 @@
-import pdfParse from "pdf-parse";
+// Import from lib directly to avoid pdf-parse's index.js test-file bug
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import mammoth from "mammoth";
 import JSZip from "jszip";
 
