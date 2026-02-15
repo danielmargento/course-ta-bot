@@ -30,6 +30,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Fetch student's concept check preference
+  const { data: studentProfile } = await supabase
+    .from("profiles")
+    .select("concept_checks_enabled")
+    .eq("id", user.id)
+    .single();
+  const conceptChecksEnabled = studentProfile?.concept_checks_enabled ?? true;
+
   // Fetch course
   const { data: course } = await supabase
     .from("courses")
@@ -122,7 +130,7 @@ export async function POST(req: NextRequest) {
     ...config,
     policy: effectivePolicy,
   };
-  const systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment, materials);
+  const systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment, materials, conceptChecksEnabled);
 
   const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/components/layout/AppShell";
 
@@ -8,9 +8,15 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   title: "pigeonhole",
-  description: "AI-powered teaching assistant for course-specific, policy-constrained learning",
+  description: "Pascal — AI-powered assistant for course-specific, policy-constrained learning",
 };
 
 export default function RootLayout({
@@ -21,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} antialiased`}
+        className={`${inter.variable} ${instrumentSerif.variable} antialiased`}
       >
         <AppShell>{children}</AppShell>
       </body>

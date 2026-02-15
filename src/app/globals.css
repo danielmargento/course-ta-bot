@@ -10,6 +10,8 @@
   --surface: #ffffff;
   --border: #e8e4df;
   --muted: #9a9088;
+  --pigeon-blue: #5b7e9a;
+  --pigeon-blue-hover: #4a6d87;
 }
 
 @theme inline {
@@ -21,6 +23,8 @@
   --color-surface: var(--surface);
   --color-border: var(--border);
   --color-muted: var(--muted);
+  --color-pigeon: var(--pigeon-blue);
+  --color-pigeon-hover: var(--pigeon-blue-hover);
   --font-sans: var(--font-inter);
 }
 

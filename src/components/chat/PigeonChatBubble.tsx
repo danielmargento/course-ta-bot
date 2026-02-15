@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 
 const WELCOME_MESSAGES = [
-  "Hi! I'm your AI TA.",
+  "Hi! I'm Pascal, your AI assistant.",
   "Ask me anything about your course!",
-  "I'm here to help you learn — not cheat.",
   "Stuck? Paste your attempt for targeted feedback.",
   "Let's work through it together.",
+  "I'm here whenever you need help.",
 ];
 
 const TYPE_DELAY = 70;
@@ -18,7 +18,7 @@ const PAUSE_AFTER_DELETING = 400;
 interface Props {
   /** Latest assistant message content (from chat or streaming) */
   assistantContent: string | null;
-  /** Whether the TA is currently streaming a response */
+  /** Whether Pascal is currently streaming a response */
   streaming?: boolean;
 }
 
@@ -55,7 +55,7 @@ export default function PigeonChatBubble({ assistantContent, streaming }: Props)
     <div className="flex items-end gap-2 px-3 pt-2 pb-1">
       <img
         src="/logo.png"
-        alt="pigeonhole TA"
+        alt="Pascal"
         className="h-12 w-12 sm:h-14 sm:w-14 object-contain animate-float shrink-0"
       />
       <div className="relative min-w-[12rem] max-w-xl min-h-[2.5rem] max-h-40 bg-white border-2 border-border rounded-xl rounded-bl-sm px-3 py-2 shadow-sm flex items-start overflow-y-auto">

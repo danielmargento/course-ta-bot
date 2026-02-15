@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
-import { aggregateInsights } from "@/lib/analytics";
+import { aggregateInsights, generateLLMInsights } from "@/lib/analytics";
 import { Session, Message, Assignment } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
@@ -52,6 +52,12 @@ export async function GET(req: NextRequest) {
     .eq("course_id", courseId)
     .returns<Assignment[]>();
 
-  const insights = aggregateInsights(courseId, sessions ?? [], messages, assignments ?? []);
+  const insights = aggregateInsights(courseId, sessions ?? [], assignments ?? []);
+
+  // Generate LLM insights from user messages
+  const userMessages = messages.filter((m) => m.role === "user");
+  const llmSummary = await generateLLMInsights(supabase, courseId, userMessages);
+  insights.llm_summary = llmSummary;
+
   return NextResponse.json(insights);
 }

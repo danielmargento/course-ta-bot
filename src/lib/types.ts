@@ -89,11 +89,8 @@ export interface TopicGate {
 
 export interface UsageInsight {
   course_id: string;
-  top_topics: { topic: string; count: number }[];
-  top_assignments: { assignment_id: string; title: string; count: number }[];
-  total_sessions: number;
-  total_messages: number;
-  avg_messages_per_session: number;
+  users_per_assignment: { assignment_id: string; title: string; unique_users: number }[];
+  llm_summary?: LLMInsightSummary | null;
 }
 
 export interface Announcement {
@@ -119,4 +116,40 @@ export interface Feedback {
   message_id: string;
   rating: "helpful" | "not_helpful" | "too_revealing";
   created_at: string;
+}
+
+export interface ConceptCheck {
+  id: string;
+  session_id: string;
+  assignment_id: string | null;
+  course_id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
+  student_answer: number | null;
+  is_correct: boolean | null;
+  created_at: string;
+}
+
+export interface ConceptCheckPayload {
+  question: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+}
+
+export interface LLMInsightSummary {
+  top_topics: { topic: string; count: number }[];
+  misconceptions: { topic: string; description: string; sample_questions: string[] }[];
+  lecture_emphasis: { lecture: string; reason: string }[];
+  generated_at: string;
+}
+
+export interface ConceptCheckAggregate {
+  assignment_id: string;
+  assignment_title: string;
+  total_answered: number;
+  total_correct: number;
+  percent_correct: number;
 }

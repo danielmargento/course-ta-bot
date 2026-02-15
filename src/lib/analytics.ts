@@ -1,85 +1,135 @@
-import { UsageInsight, Session, Message, Assignment } from "./types";
+import OpenAI from "openai";
+import { UsageInsight, Session, Message, Assignment, LLMInsightSummary } from "./types";
+import { SupabaseClient } from "@supabase/supabase-js";
 
-const STOP_WORDS = new Set([
-  "about", "after", "again", "being", "between", "could", "does", "doing",
-  "during", "every", "from", "have", "having", "here", "into", "just",
-  "might", "more", "most", "much", "must", "never", "only", "other",
-  "over", "really", "same", "shall", "should", "some", "still", "such",
-  "than", "that", "their", "them", "then", "there", "these", "they",
-  "this", "those", "through", "under", "very", "want", "what", "when",
-  "where", "which", "while", "will", "with", "would", "your",
-  "been", "before", "each", "first", "help", "like", "make", "many",
-  "need", "also", "back", "because", "come", "even", "give", "good",
-  "know", "look", "take", "tell", "think", "trying", "using", "well",
-  "work",
-]);
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
+}
+
+/**
+ * Generate LLM-powered insight summaries from student messages.
+ * Results are cached in course_insights_cache for 1 hour.
+ */
+export async function generateLLMInsights(
+  supabase: SupabaseClient,
+  courseId: string,
+  userMessages: Message[]
+): Promise<LLMInsightSummary | null> {
+  // Check cache first
+  const { data: cached } = await supabase
+    .from("course_insights_cache")
+    .select("insights, generated_at")
+    .eq("course_id", courseId)
+    .single();
+
+  if (cached) {
+    const age = Date.now() - new Date(cached.generated_at).getTime();
+    if (age < 60 * 60 * 1000) {
+      return cached.insights as LLMInsightSummary;
+    }
+  }
+
+  if (userMessages.length === 0) return null;
+
+  // Sample up to 200 recent user messages
+  const sampled = userMessages
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 200);
+
+  const messagesText = sampled
+    .map((m, i) => `${i + 1}. ${m.content}`)
+    .join("\n");
+
+  const completion = await getOpenAI().chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: `You are an educational analytics assistant. Analyze these student questions sent to Pascal, a course AI assistant. Identify patterns across ALL messages — do not focus on individual students.
+
+Return a JSON object with exactly this structure:
+{
+  "top_topics": [
+    {"topic": "Topic Name", "count": 42}
+  ],
+  "misconceptions": [
+    {
+      "topic": "short topic name",
+      "description": "what students get wrong",
+      "sample_questions": ["actual student question 1", "actual student question 2"]
+    }
+  ],
+  "lecture_emphasis": [
+    {"lecture": "specific lecture/topic name", "reason": "specific subtopics or concepts within this lecture students struggle with"}
+  ]
+}
+
+Rules:
+- top_topics: exactly 5 items — the most discussed conceptual topics across all messages. Only include real academic concepts (e.g. "Recursion", "Big-O Notation", "Linked Lists"). EXCLUDE generic references like "homework question 2", "problem 3", "assignment help", etc. "count" is your estimate of how many messages relate to that topic.
+- misconceptions: max 5 items — concepts students commonly misunderstand. For each, include 1-3 REAL sample questions from the messages. Each sample question must be substantive and DISTINCT from the others — do NOT include two questions that ask essentially the same thing. Pick questions that show different angles of the misconception.
+- lecture_emphasis: max 5 items — lectures or topics needing more emphasis. Be SPECIFIC about which subtopics or concepts within the lecture students struggle with. Instead of "Sorting Algorithms", say "Sorting Algorithms — merge sort recurrence relations and partitioning in quicksort". The "reason" should describe the specific conceptual gaps students show.
+- Be specific and actionable — a teacher should be able to use these to adjust their teaching
+- Return ONLY valid JSON, no markdown fences`,
+      },
+      {
+        role: "user",
+        content: `Here are ${sampled.length} recent student messages:\n\n${messagesText}`,
+      },
+    ],
+    temperature: 0.3,
+  });
+
+  const raw = completion.choices[0]?.message?.content ?? "";
+  let summary: LLMInsightSummary;
+  try {
+    const parsed = JSON.parse(raw);
+    summary = {
+      top_topics: parsed.top_topics ?? [],
+      misconceptions: parsed.misconceptions ?? [],
+      lecture_emphasis: parsed.lecture_emphasis ?? [],
+      generated_at: new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+
+  // Upsert cache
+  await supabase
+    .from("course_insights_cache")
+    .upsert(
+      { course_id: courseId, insights: summary, generated_at: new Date().toISOString() },
+      { onConflict: "course_id" }
+    );
+
+  return summary;
+}
 
 export function aggregateInsights(
   courseId: string,
   sessions: Session[],
-  messages: Message[],
   assignments: Assignment[]
 ): UsageInsight {
-  // Build session → assignment_id lookup
-  const sessionAssignment = new Map<string, string>();
+  // Build assignment → unique student set
+  const assignmentUsers = new Map<string, Set<string>>();
   for (const s of sessions) {
     if (s.assignment_id) {
-      sessionAssignment.set(s.id, s.assignment_id);
-    }
-  }
-
-  // Count messages per assignment
-  const assignmentMsgCounts = new Map<string, number>();
-  for (const m of messages) {
-    const assignmentId = sessionAssignment.get(m.session_id);
-    if (assignmentId) {
-      assignmentMsgCounts.set(assignmentId, (assignmentMsgCounts.get(assignmentId) ?? 0) + 1);
+      if (!assignmentUsers.has(s.assignment_id)) assignmentUsers.set(s.assignment_id, new Set());
+      assignmentUsers.get(s.assignment_id)!.add(s.student_id);
     }
   }
 
   const assignmentMap = new Map(assignments.map((a) => [a.id, a.title]));
-  const top_assignments = Array.from(assignmentMsgCounts.entries())
-    .map(([assignment_id, count]) => ({
+  const users_per_assignment = Array.from(assignmentUsers.entries())
+    .map(([assignment_id, users]) => ({
       assignment_id,
       title: assignmentMap.get(assignment_id) ?? "Unknown",
-      count,
+      unique_users: users.size,
     }))
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => b.unique_users - a.unique_users)
     .slice(0, 10);
-
-  // Extract topic keywords from user messages
-  const wordCounts = new Map<string, number>();
-  const userMessages = messages.filter((m) => m.role === "user");
-  for (const m of userMessages) {
-    const words = m.content
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
-      .split(/\s+/)
-      .filter((w) => w.length > 4 && !STOP_WORDS.has(w));
-
-    const seen = new Set<string>();
-    for (const word of words) {
-      if (!seen.has(word)) {
-        seen.add(word);
-        wordCounts.set(word, (wordCounts.get(word) ?? 0) + 1);
-      }
-    }
-  }
-
-  const top_topics = Array.from(wordCounts.entries())
-    .map(([topic, count]) => ({ topic, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  const avg_messages_per_session =
-    sessions.length > 0 ? Math.round((messages.length / sessions.length) * 10) / 10 : 0;
 
   return {
     course_id: courseId,
-    top_topics,
-    top_assignments,
-    total_sessions: sessions.length,
-    total_messages: messages.length,
-    avg_messages_per_session,
+    users_per_assignment,
   };
 }

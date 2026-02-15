@@ -52,7 +52,17 @@ export default function CourseCard({ course, basePath, showClassCode, announceme
         )}
         {showClassCode && course.class_code && (
           <p className="text-xs text-muted mt-3">
-            Join code: <span className="font-mono font-semibold text-foreground">{course.class_code}</span>
+            Join code:{" "}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                navigator.clipboard.writeText(course.class_code);
+              }}
+              className="font-mono font-semibold text-foreground hover:text-accent transition-colors cursor-pointer"
+              title="Click to copy"
+            >
+              {course.class_code}
+            </button>
           </p>
         )}
       </Link>
@@ -62,6 +72,18 @@ export default function CourseCard({ course, basePath, showClassCode, announceme
           <button
             onClick={(e) => {
               e.preventDefault();
+              if (!showAnnouncements && announcements) {
+                // Mark unviewed announcements as viewed
+                announcements.forEach((a) => {
+                  if (!a.viewed) {
+                    fetch("/api/announcements/view", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ announcement_id: a.id }),
+                    });
+                  }
+                });
+              }
               setShowAnnouncements(!showAnnouncements);
             }}
             className="flex items-center gap-1.5 text-xs text-muted hover:text-foreground transition-colors"

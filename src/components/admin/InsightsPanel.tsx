@@ -7,21 +7,21 @@ interface Props {
 }
 
 const DONUT_COLORS = [
-  "#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe",
-  "#818cf8", "#7c3aed", "#9333ea", "#a855f7", "#c084fc",
+  "#8b7355", "#a08b6a", "#b5a37f", "#cabc95", "#dfd5ab",
+  "#6b5b45", "#9e8e70", "#c2b496", "#d4c9a8", "#e8dfc0",
 ];
 
-const BAR_COLOR = "#6366f1";
+const BAR_COLOR = "#8b7355";
 
 function DonutChart({ topics }: { topics: { topic: string; count: number }[] }) {
   const total = topics.reduce((s, t) => s + t.count, 0);
   if (total === 0) return null;
 
-  const size = 140;
+  const size = 180;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = 55;
-  const innerRadius = 35;
+  const radius = 70;
+  const innerRadius = 45;
 
   let cumulative = 0;
   const slices = topics.map((t, i) => {
@@ -54,7 +54,7 @@ function DonutChart({ topics }: { topics: { topic: string; count: number }[] }) 
   });
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-4">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {topics.length === 1 ? (
           <>
@@ -64,25 +64,16 @@ function DonutChart({ topics }: { topics: { topic: string; count: number }[] }) 
         ) : (
           slices
         )}
-        <text
-          x={cx}
-          y={cy}
-          textAnchor="middle"
-          dominantBaseline="central"
-          className="fill-foreground text-lg font-bold"
-        >
-          {total}
-        </text>
       </svg>
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
-        {topics.slice(0, 6).map((t, i) => (
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+        {topics.map((t, i) => (
           <div key={t.topic} className="flex items-center gap-1.5 text-xs text-muted">
             <span
               className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
               style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }}
             />
-            <span className="truncate max-w-[80px]">{t.topic}</span>
-            <span className="text-muted/60">{t.count}</span>
+            <span>{t.topic}</span>
+            <span className="text-muted/60">({t.count})</span>
           </div>
         ))}
       </div>
@@ -90,16 +81,16 @@ function DonutChart({ topics }: { topics: { topic: string; count: number }[] }) 
   );
 }
 
-function BarChart({ assignments }: { assignments: { title: string; count: number }[] }) {
-  if (assignments.length === 0) return null;
+function BarChart({ data }: { data: { label: string; value: number }[] }) {
+  if (data.length === 0) return null;
 
-  const maxCount = Math.max(...assignments.map((a) => a.count));
-  const barHeight = 24;
-  const gap = 8;
-  const labelWidth = 120;
-  const chartWidth = 300;
-  const totalWidth = labelWidth + chartWidth + 40;
-  const totalHeight = assignments.length * (barHeight + gap) - gap;
+  const maxVal = Math.max(...data.map((d) => d.value));
+  const barHeight = 28;
+  const gap = 10;
+  const labelWidth = 100;
+  const chartWidth = 240;
+  const totalWidth = labelWidth + chartWidth + 50;
+  const totalHeight = data.length * (barHeight + gap) - gap;
 
   return (
     <svg
@@ -107,11 +98,11 @@ function BarChart({ assignments }: { assignments: { title: string; count: number
       viewBox={`0 0 ${totalWidth} ${totalHeight}`}
       className="overflow-visible"
     >
-      {assignments.map((a, i) => {
+      {data.map((d, i) => {
         const y = i * (barHeight + gap);
-        const barW = maxCount > 0 ? (a.count / maxCount) * chartWidth : 0;
+        const barW = maxVal > 0 ? (d.value / maxVal) * chartWidth : 0;
         return (
-          <g key={a.title + i}>
+          <g key={d.label + i}>
             <text
               x={labelWidth - 8}
               y={y + barHeight / 2}
@@ -119,7 +110,7 @@ function BarChart({ assignments }: { assignments: { title: string; count: number
               dominantBaseline="central"
               className="fill-muted text-[11px]"
             >
-              {a.title.length > 18 ? a.title.slice(0, 18) + "..." : a.title}
+              {d.label.length > 14 ? d.label.slice(0, 14) + "..." : d.label}
             </text>
             <rect
               x={labelWidth}
@@ -135,7 +126,7 @@ function BarChart({ assignments }: { assignments: { title: string; count: number
               dominantBaseline="central"
               className="fill-muted text-[11px]"
             >
-              {a.count}
+              {d.value}
             </text>
           </g>
         );
@@ -156,75 +147,81 @@ export default function InsightsPanel({ insights }: Props) {
     );
   }
 
-  const totalTopicQuestions = insights.top_topics.reduce((s, t) => s + t.count, 0);
+  const llm = insights.llm_summary;
+  const hasTopics = llm?.top_topics && llm.top_topics.length > 0;
+  const hasUsers = insights.users_per_assignment.length > 0;
 
   return (
     <div className="space-y-6">
       <h3 className="text-sm font-semibold text-foreground">Usage Insights</h3>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Total Sessions", value: insights.total_sessions },
-          { label: "Total Messages", value: insights.total_messages },
-          { label: "Avg Msgs / Session", value: insights.avg_messages_per_session },
-          { label: "Active Topics", value: insights.top_topics.length },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-background border border-border rounded-lg p-4"
-          >
-            <p className="text-xs text-muted">{stat.label}</p>
-            <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts Row */}
-      {(insights.top_topics.length > 0 || insights.top_assignments.length > 0) && (
+      {/* Charts Row: Donut + Bar side by side */}
+      {(hasTopics || hasUsers) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {insights.top_topics.length > 0 && (
+          {hasTopics && (
             <div className="bg-background border border-border rounded-lg p-4">
               <h4 className="text-xs font-semibold text-muted mb-3">Top Topics</h4>
-              <DonutChart topics={insights.top_topics} />
+              <DonutChart topics={llm!.top_topics} />
             </div>
           )}
-          {insights.top_assignments.length > 0 && (
+          {hasUsers && (
             <div className="bg-background border border-border rounded-lg p-4">
-              <h4 className="text-xs font-semibold text-muted mb-3">Messages by Assignment</h4>
-              <BarChart assignments={insights.top_assignments} />
+              <h4 className="text-xs font-semibold text-muted mb-3">Users by Assignment</h4>
+              <BarChart
+                data={insights.users_per_assignment.map((a) => ({
+                  label: a.title,
+                  value: a.unique_users,
+                }))}
+              />
             </div>
           )}
         </div>
       )}
 
-      {/* Topic Breakdown Table */}
-      {insights.top_topics.length > 0 && (
+      {/* Common Misconceptions */}
+      {llm?.misconceptions && llm.misconceptions.length > 0 && (
         <div className="bg-background border border-border rounded-lg p-4">
-          <h4 className="text-xs font-semibold text-muted mb-3">Topic Breakdown</h4>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted border-b border-border">
-                <th className="pb-2 font-medium">Topic</th>
-                <th className="pb-2 font-medium text-right">Questions</th>
-                <th className="pb-2 font-medium text-right">% of Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {insights.top_topics.map((t) => (
-                <tr key={t.topic} className="border-b border-border/50 last:border-0">
-                  <td className="py-2 text-foreground capitalize">{t.topic}</td>
-                  <td className="py-2 text-muted text-right">{t.count}</td>
-                  <td className="py-2 text-muted text-right">
-                    {totalTopicQuestions > 0
-                      ? Math.round((t.count / totalTopicQuestions) * 100)
-                      : 0}
-                    %
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h4 className="text-xs font-semibold text-muted mb-3">Common Misconceptions</h4>
+          <div className="space-y-4">
+            {llm.misconceptions.map((m, i) => (
+              <div key={i}>
+                <p className="text-sm font-medium text-foreground">{m.topic}</p>
+                <p className="text-xs text-muted mt-0.5">{m.description}</p>
+                {m.sample_questions && m.sample_questions.length > 0 && (
+                  <div className="mt-1.5 pl-3 border-l-2 border-accent/20 space-y-1">
+                    {m.sample_questions.map((q, j) => (
+                      <p key={j} className="text-xs text-muted/80 italic">
+                        &ldquo;{q}&rdquo;
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Lectures Needing Emphasis */}
+      {llm?.lecture_emphasis && llm.lecture_emphasis.length > 0 && (
+        <div className="bg-background border border-border rounded-lg p-4">
+          <h4 className="text-xs font-semibold text-muted mb-3">Lectures Needing Emphasis</h4>
+          <div className="space-y-2.5">
+            {llm.lecture_emphasis.map((l, i) => (
+              <div key={i}>
+                <p className="text-sm font-medium text-foreground">{l.lecture}</p>
+                <p className="text-xs text-muted mt-0.5">{l.reason}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!llm && (
+        <div className="bg-background border border-border rounded-lg p-4 text-center">
+          <p className="text-xs text-muted">
+            AI-generated insights will appear after enough student interactions.
+          </p>
         </div>
       )}
     </div>

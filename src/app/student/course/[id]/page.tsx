@@ -6,14 +6,15 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import ChatComposer from "@/components/chat/ChatComposer";
 import AssignmentSelect from "@/components/assignments/AssignmentSelect";
 import SavedNotesPanel from "@/components/chat/SavedNotesPanel";
-import { Announcement, Assignment, Message } from "@/lib/types";
+import { Assignment, Message } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
+import { parseConceptCheck } from "@/lib/conceptCheck";
 
 export default function StudentCoursePage() {
   const { id: courseId } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const resumeSessionId = searchParams.get("session");
-  const { user, loading: userLoading } = useUser();
+  const { user, conceptChecksEnabled, setConceptChecksEnabled, loading: userLoading } = useUser();
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
@@ -21,38 +22,19 @@ export default function StudentCoursePage() {
   const [streaming, setStreaming] = useState(false);
   const sessionIdRef = useRef<string | null>(resumeSessionId);
   const isNewSessionRef = useRef(true);
-  // Cache of assignment_id (or "general") → session_id so we don't re-fetch
   const sessionCacheRef = useRef<Record<string, string>>({});
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [showAnnouncements, setShowAnnouncements] = useState(true);
   const [activeTab, setActiveTab] = useState<"chat" | "notes">("chat");
+
+  // Concept check state: messageId → conceptCheckId, conceptCheckId → studentAnswer, conceptCheckId → saved
+  const [conceptCheckIds, setConceptCheckIds] = useState<Record<string, string>>({});
+  const [conceptCheckAnswers, setConceptCheckAnswers] = useState<Record<string, number>>({});
+  const [conceptCheckSaved, setConceptCheckSaved] = useState<Record<string, boolean>>({});
 
   // Load assignments
   useEffect(() => {
     fetch(`/api/assignments?course_id=${courseId}`)
       .then((r) => r.json())
       .then(setAssignments)
-      .catch(() => {});
-  }, [courseId]);
-
-  // Load announcements
-  useEffect(() => {
-    fetch(`/api/announcements?course_id=${courseId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setAnnouncements(data);
-          data.forEach((a: Announcement) => {
-            if (!a.viewed) {
-              fetch("/api/announcements/view", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ announcement_id: a.id }),
-              });
-            }
-          });
-        }
-      })
       .catch(() => {});
   }, [courseId]);
 
@@ -71,11 +53,10 @@ export default function StudentCoursePage() {
 
   // When assignment selection changes, load or create a session for that assignment
   useEffect(() => {
-    if (resumeSessionId) return; // Don't override if resuming a specific session
+    if (resumeSessionId) return;
 
     const key = selectedAssignment ?? "general";
 
-    // If we already have a cached session for this assignment, load it
     if (sessionCacheRef.current[key]) {
       const cachedSessionId = sessionCacheRef.current[key];
       sessionIdRef.current = cachedSessionId;
@@ -89,7 +70,6 @@ export default function StudentCoursePage() {
       return;
     }
 
-    // Look for an existing session for this assignment
     const params = new URLSearchParams({ course_id: courseId });
     fetch(`/api/sessions?${params}`)
       .then((r) => r.json())
@@ -109,7 +89,6 @@ export default function StudentCoursePage() {
             })
             .catch(() => setMessages([]));
         } else {
-          // No existing session — start fresh
           sessionIdRef.current = null;
           isNewSessionRef.current = true;
           setMessages([]);
@@ -163,6 +142,63 @@ export default function StudentCoursePage() {
     });
   };
 
+  const persistConceptCheck = async (
+    sessionId: string,
+    messageId: string,
+    assistantText: string
+  ) => {
+    const { conceptCheck } = parseConceptCheck(assistantText);
+    if (!conceptCheck) return;
+
+    try {
+      const res = await fetch("/api/concept-checks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          session_id: sessionId,
+          assignment_id: selectedAssignment,
+          course_id: courseId,
+          question: conceptCheck.question,
+          options: conceptCheck.options,
+          correct_index: conceptCheck.correct,
+          explanation: conceptCheck.explanation,
+        }),
+      });
+      const data = await res.json();
+      if (data.id) {
+        setConceptCheckIds((prev) => ({ ...prev, [messageId]: data.id }));
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleConceptCheckAnswer = async (conceptCheckId: string, selectedIndex: number) => {
+    setConceptCheckAnswers((prev) => ({ ...prev, [conceptCheckId]: selectedIndex }));
+    await fetch("/api/concept-checks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "answer",
+        concept_check_id: conceptCheckId,
+        student_answer: selectedIndex,
+      }),
+    });
+  };
+
+  const handleToggleConceptCheckSave = async (conceptCheckId: string, saved: boolean) => {
+    setConceptCheckSaved((prev) => ({ ...prev, [conceptCheckId]: saved }));
+    await fetch("/api/concept-checks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: saved ? "save" : "unsave",
+        concept_check_id: conceptCheckId,
+      }),
+    });
+  };
+
   const handleSend = async (text: string) => {
     setStreaming(true);
 
@@ -170,11 +206,9 @@ export default function StudentCoursePage() {
       const sessionId = await ensureSession();
       const wasNewSession = isNewSessionRef.current && messages.length === 0;
 
-      // Save user message to DB and add to state with real ID
       const savedUser = await saveMessage(sessionId, "user", text);
       setMessages((prev) => [...prev, savedUser]);
 
-      // Start streaming
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -191,7 +225,6 @@ export default function StudentCoursePage() {
       let assistantText = "";
       const placeholderId = `tmp-${Date.now()}-a`;
 
-      // Add placeholder for streaming assistant message
       setMessages((prev) => [
         ...prev,
         {
@@ -228,14 +261,15 @@ export default function StudentCoursePage() {
         }
       }
 
-      // Save assistant message to DB and replace placeholder with real ID
       if (assistantText) {
         const savedAssistant = await saveMessage(sessionId, "assistant", assistantText);
         setMessages((prev) =>
           prev.map((m) => (m.id === placeholderId ? savedAssistant : m))
         );
 
-        // Auto-title after first exchange on a new session
+        // Persist concept check if present
+        persistConceptCheck(sessionId, savedAssistant.id, assistantText);
+
         if (wasNewSession) {
           isNewSessionRef.current = false;
           autoTitleSession(sessionId, text);
@@ -260,6 +294,16 @@ export default function StudentCoursePage() {
     });
   };
 
+  const toggleConceptChecks = async () => {
+    const newValue = !conceptChecksEnabled;
+    setConceptChecksEnabled(newValue);
+    await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ concept_checks_enabled: newValue }),
+    });
+  };
+
   if (userLoading) {
     return (
       <div className="max-w-4xl mx-auto flex items-center justify-center h-[calc(100vh-120px)]">
@@ -268,45 +312,8 @@ export default function StudentCoursePage() {
     );
   }
 
-  const unviewedCount = announcements.filter((a) => !a.viewed).length;
-
   return (
     <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-120px)]">
-      {announcements.length > 0 && (
-        <div className="mb-4">
-          <button
-            onClick={() => setShowAnnouncements(!showAnnouncements)}
-            className="text-xs text-accent hover:underline mb-2"
-          >
-            {showAnnouncements ? "Hide" : "Show"} announcements ({announcements.length})
-            {unviewedCount > 0 && !showAnnouncements && (
-              <span className="ml-1 bg-accent text-white px-1.5 py-0.5 rounded-full text-[10px]">
-                {unviewedCount} new
-              </span>
-            )}
-          </button>
-          {showAnnouncements && (
-            <div className="space-y-2">
-              {announcements.map((a) => (
-                <div
-                  key={a.id}
-                  className={`p-3 border rounded-lg text-sm ${
-                    a.viewed
-                      ? "bg-background border-border"
-                      : "bg-accent-light border-accent/20"
-                  }`}
-                >
-                  <p className="text-foreground whitespace-pre-wrap">{a.content}</p>
-                  <span className="text-xs text-muted mt-1 block">
-                    {new Date(a.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           {activeTab === "chat" && (
@@ -316,8 +323,17 @@ export default function StudentCoursePage() {
                 selected={selectedAssignment}
                 onSelect={setSelectedAssignment}
               />
+              <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={conceptChecksEnabled}
+                  onChange={toggleConceptChecks}
+                  className="accent-accent rounded"
+                />
+                Quizzes
+              </label>
               {streaming && (
-                <span className="text-xs text-muted animate-pulse">TA is typing...</span>
+                <span className="text-xs text-muted animate-pulse">Pascal is typing...</span>
               )}
             </>
           )}
@@ -377,11 +393,16 @@ export default function StudentCoursePage() {
             <ChatWindow
               messages={messages}
               onToggleSave={handleToggleSave}
+              conceptCheckIds={conceptCheckIds}
+              conceptCheckAnswers={conceptCheckAnswers}
+              onConceptCheckAnswer={handleConceptCheckAnswer}
+              conceptCheckSaved={conceptCheckSaved}
+              onToggleConceptCheckSave={handleToggleConceptCheckSave}
             />
             <div className="flex items-end gap-3 border-t border-border bg-surface p-3">
               <img
                 src="/logo.png"
-                alt="pigeonhole TA"
+                alt="Pascal"
                 className="h-12 w-12 sm:h-14 sm:w-14 object-contain animate-float shrink-0"
               />
               <div className="flex-1 min-w-0">

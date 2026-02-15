@@ -79,7 +79,7 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-1">Course Materials</h3>
         <p className="text-xs text-muted mb-4">
-          Upload lecture slides, problem sets, practice tests, and other materials. The AI TA will use the content of these files to help students.
+          Upload lecture slides, problem sets, practice tests, and other materials. Pascal will use the content of these files to help students.
         </p>
 
         <div className="flex gap-3 mb-3">

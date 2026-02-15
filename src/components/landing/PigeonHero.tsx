@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 const MESSAGES = [
-  "Hi! I'm your AI TA.",
+  "Hi! I'm Pascal, your AI assistant.",
   "Ask me anything about your course!",
-  "I help you learn, not cheat.",
   "Stuck at 2 AM? I've got you.",
   "Let's work through it together.",
+  "I'm here whenever you need help.",
 ];
 
 const TYPE_DELAY = 80;
@@ -65,7 +65,7 @@ export default function PigeonHero() {
       <img
         src="/logo.png"
         alt="pigeonhole mascot"
-        className="h-40 w-40 sm:h-52 sm:w-52 animate-float object-contain"
+        className="h-52 w-52 sm:h-72 sm:w-72 animate-float object-contain"
       />
 
       {/* Speech bubble positioned above-right, near the pigeon's head */}

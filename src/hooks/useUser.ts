@@ -8,6 +8,7 @@ export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<"student" | "instructor" | null>(null);
   const [firstName, setFirstName] = useState<string | null>(null);
+  const [conceptChecksEnabled, setConceptChecksEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,12 +19,13 @@ export function useUser() {
       if (user) {
         supabase
           .from("profiles")
-          .select("role, first_name")
+          .select("role, first_name, concept_checks_enabled")
           .eq("id", user.id)
           .single()
           .then(({ data }) => {
             setRole(data?.role ?? "student");
             setFirstName(data?.first_name || null);
+            setConceptChecksEnabled(data?.concept_checks_enabled ?? true);
             setLoading(false);
           });
       } else {
@@ -44,5 +46,5 @@ export function useUser() {
     return () => subscription.unsubscribe();
   }, []);
 
-  return { user, role, firstName, loading };
+  return { user, role, firstName, conceptChecksEnabled, setConceptChecksEnabled, loading };
 }

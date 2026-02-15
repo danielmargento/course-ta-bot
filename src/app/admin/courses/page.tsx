@@ -47,7 +47,7 @@ export default function AdminCoursesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-foreground">Courses</h1>
-          <p className="text-sm text-muted mt-1">Manage your courses and TA configurations.</p>
+          <p className="text-sm text-muted mt-1">Manage your courses and Pascal configurations.</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}

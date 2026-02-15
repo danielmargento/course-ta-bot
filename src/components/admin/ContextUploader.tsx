@@ -12,7 +12,7 @@ export default function ContextUploader({ context, onChange }: Props) {
         Course Context
       </label>
       <p className="text-xs text-muted mb-3">
-        Paste syllabus, lecture notes, or other materials the TA should reference.
+        Paste syllabus, lecture notes, or other materials Pascal should reference.
       </p>
       <textarea
         className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"

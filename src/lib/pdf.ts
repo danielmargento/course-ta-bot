@@ -38,7 +38,7 @@ export function printMessages(groups: PdfGroup[], title: string): void {
   for (const group of groups) {
     body += `<h2>${group.groupName}</h2>`;
     for (const msg of group.messages) {
-      const label = msg.role === "user" ? "Student" : "TA";
+      const label = msg.role === "user" ? "Student" : "Pascal";
       const cls = msg.role === "user" ? "label-student" : "label-ta";
       body += `
         <div class="message">
