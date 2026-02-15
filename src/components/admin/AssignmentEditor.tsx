@@ -22,17 +22,17 @@ const helpLevelOptions = [
   {
     value: 1,
     label: "Strict",
-    description: "No direct answers. Only confirms if the student is on the right track.",
+    description: "Verification only. Confirms right/wrong, never gives hints or guidance. Points students to course materials instead.",
   },
   {
     value: 3,
     label: "Guided",
-    description: "Step-by-step hints that lead toward the answer without giving it away.",
+    description: "Socratic method. Asks guiding questions, gives incremental hints, but never reveals the final answer or complete solution.",
   },
   {
     value: 5,
     label: "Full support",
-    description: "Will explain everything, including worked examples, after enough effort.",
+    description: "Complete tutoring. Starts with guidance, then provides full answers and worked solutions after the student shows effort.",
   },
 ];
 

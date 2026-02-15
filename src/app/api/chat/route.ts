@@ -81,6 +81,8 @@ export async function POST(req: NextRequest) {
     materials = matData ?? [];
   }
 
+  console.log("[chat] materials found:", materials.length, "with text:", materials.filter(m => m.extracted_text).length, materials.map(m => ({ name: m.file_name, textLen: m.extracted_text?.length ?? 0 })));
+
   // Merge assignment-level policy overrides into course-level policy
   const effectivePolicy = assignment?.overrides
     ? { ...config.policy, ...assignment.overrides }

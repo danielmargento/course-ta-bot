@@ -65,8 +65,13 @@ export async function POST(req: NextRequest) {
   let extractedText = "";
   try {
     extractedText = await extractText(buffer, fileType);
+    if (!extractedText) {
+      console.warn(`Text extraction returned empty for ${file.name}`);
+    } else {
+      console.log(`Extracted ${extractedText.length} chars from ${file.name}`);
+    }
   } catch (e) {
-    console.error("Text extraction failed:", e);
+    console.error(`Text extraction failed for ${file.name}:`, e);
     // Continue with empty text rather than failing the upload
   }
 
