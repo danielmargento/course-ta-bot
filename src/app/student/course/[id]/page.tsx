@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import ChatWindow from "@/components/chat/ChatWindow";
 import ChatComposer from "@/components/chat/ChatComposer";
 import AssignmentSelect from "@/components/assignments/AssignmentSelect";
-import ExportButton from "@/components/pdf/ExportButton";
+import SavedNotesPanel from "@/components/chat/SavedNotesPanel";
 import { Announcement, Assignment, Message } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
 
@@ -21,8 +21,11 @@ export default function StudentCoursePage() {
   const [streaming, setStreaming] = useState(false);
   const sessionIdRef = useRef<string | null>(resumeSessionId);
   const isNewSessionRef = useRef(true);
+  // Cache of assignment_id (or "general") → session_id so we don't re-fetch
+  const sessionCacheRef = useRef<Record<string, string>>({});
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [showAnnouncements, setShowAnnouncements] = useState(true);
+  const [activeTab, setActiveTab] = useState<"chat" | "notes">("chat");
 
   // Load assignments
   useEffect(() => {
@@ -39,7 +42,6 @@ export default function StudentCoursePage() {
       .then((data) => {
         if (Array.isArray(data)) {
           setAnnouncements(data);
-          // Mark unviewed ones as viewed
           data.forEach((a: Announcement) => {
             if (!a.viewed) {
               fetch("/api/announcements/view", {
@@ -67,6 +69,59 @@ export default function StudentCoursePage() {
       .catch(() => {});
   }, [resumeSessionId]);
 
+  // When assignment selection changes, load or create a session for that assignment
+  useEffect(() => {
+    if (resumeSessionId) return; // Don't override if resuming a specific session
+
+    const key = selectedAssignment ?? "general";
+
+    // If we already have a cached session for this assignment, load it
+    if (sessionCacheRef.current[key]) {
+      const cachedSessionId = sessionCacheRef.current[key];
+      sessionIdRef.current = cachedSessionId;
+      isNewSessionRef.current = false;
+      fetch(`/api/messages?session_id=${cachedSessionId}`)
+        .then((r) => r.json())
+        .then((data: Message[]) => {
+          if (Array.isArray(data)) setMessages(data);
+        })
+        .catch(() => setMessages([]));
+      return;
+    }
+
+    // Look for an existing session for this assignment
+    const params = new URLSearchParams({ course_id: courseId });
+    fetch(`/api/sessions?${params}`)
+      .then((r) => r.json())
+      .then((sessions) => {
+        if (!Array.isArray(sessions)) return;
+        const match = sessions.find((s: { assignment_id: string | null }) =>
+          selectedAssignment ? s.assignment_id === selectedAssignment : !s.assignment_id
+        );
+        if (match) {
+          sessionIdRef.current = match.id;
+          isNewSessionRef.current = false;
+          sessionCacheRef.current[key] = match.id;
+          fetch(`/api/messages?session_id=${match.id}`)
+            .then((r) => r.json())
+            .then((data: Message[]) => {
+              if (Array.isArray(data)) setMessages(data);
+            })
+            .catch(() => setMessages([]));
+        } else {
+          // No existing session — start fresh
+          sessionIdRef.current = null;
+          isNewSessionRef.current = true;
+          setMessages([]);
+        }
+      })
+      .catch(() => {
+        sessionIdRef.current = null;
+        isNewSessionRef.current = true;
+        setMessages([]);
+      });
+  }, [selectedAssignment, courseId, resumeSessionId]);
+
   const ensureSession = async (): Promise<string> => {
     if (sessionIdRef.current) return sessionIdRef.current;
     const res = await fetch("/api/sessions", {
@@ -81,6 +136,8 @@ export default function StudentCoursePage() {
     const session = await res.json();
     sessionIdRef.current = session.id;
     isNewSessionRef.current = true;
+    const key = selectedAssignment ?? "general";
+    sessionCacheRef.current[key] = session.id;
     return session.id;
   };
 
@@ -203,16 +260,6 @@ export default function StudentCoursePage() {
     });
   };
 
-  const handleFeedback = async (messageId: string, rating: string) => {
-    await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "feedback", message_id: messageId, rating }),
-    });
-  };
-
-  const savedMessages = messages.filter((m) => m.saved);
-
   if (userLoading) {
     return (
       <div className="max-w-4xl mx-auto flex items-center justify-center h-[calc(100vh-120px)]">
@@ -262,58 +309,89 @@ export default function StudentCoursePage() {
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <AssignmentSelect
-            assignments={assignments}
-            selected={selectedAssignment}
-            onSelect={setSelectedAssignment}
-          />
-          {streaming && (
-            <span className="text-xs text-muted animate-pulse">TA is typing...</span>
+          {activeTab === "chat" && (
+            <>
+              <AssignmentSelect
+                assignments={assignments}
+                selected={selectedAssignment}
+                onSelect={setSelectedAssignment}
+              />
+              {streaming && (
+                <span className="text-xs text-muted animate-pulse">TA is typing...</span>
+              )}
+            </>
           )}
         </div>
-        <ExportButton messages={savedMessages} title="Saved Messages" />
-      </div>
-      <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden relative">
-        <ChatWindow
-          messages={messages}
-          onToggleSave={handleToggleSave}
-          onFeedback={handleFeedback}
-        />
-        {selectedAssignment && (() => {
-          const assignment = assignments.find((a) => a.id === selectedAssignment);
-          if (!assignment?.due_date) return null;
-          const due = new Date(assignment.due_date);
-          const now = new Date();
-          const isPast = due < now;
-          return (
-            <div
-              className={`px-3 py-1.5 text-xs font-medium text-center border-t border-border ${
-                isPast
-                  ? "bg-red-50 text-red-600"
-                  : "bg-amber-50 text-amber-700 animate-pulse"
-              }`}
-            >
-              {isPast ? "Past due" : "Due"}: {due.toLocaleString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-                timeZoneName: "short",
-              })}
-            </div>
-          );
-        })()}
-        <div className="flex items-end gap-3 border-t border-border bg-surface p-3">
-          <img
-            src="/logo.png"
-            alt="pigeonhole TA"
-            className="h-12 w-12 sm:h-14 sm:w-14 object-contain animate-float shrink-0"
-          />
-          <div className="flex-1 min-w-0">
-            <ChatComposer onSend={handleSend} disabled={streaming} />
-          </div>
+        <div className="flex items-center gap-1 bg-surface border border-border rounded-lg p-0.5">
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              activeTab === "chat"
+                ? "bg-accent text-white"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            onClick={() => setActiveTab("notes")}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              activeTab === "notes"
+                ? "bg-accent text-white"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            Saved Notes
+          </button>
         </div>
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col bg-surface border border-border rounded-lg overflow-hidden relative">
+        {activeTab === "chat" ? (
+          <>
+            {selectedAssignment && (() => {
+              const assignment = assignments.find((a) => a.id === selectedAssignment);
+              if (!assignment?.due_date) return null;
+              const due = new Date(assignment.due_date);
+              const now = new Date();
+              const isPast = due < now;
+              return (
+                <div
+                  className={`px-3 py-1.5 text-xs font-medium text-center border-b border-border ${
+                    isPast
+                      ? "bg-red-50 text-red-600"
+                      : "bg-amber-50 text-amber-700 animate-pulse"
+                  }`}
+                >
+                  {isPast ? "Past due" : "Due"}: {due.toLocaleString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    timeZoneName: "short",
+                  })}
+                </div>
+              );
+            })()}
+            <ChatWindow
+              messages={messages}
+              onToggleSave={handleToggleSave}
+            />
+            <div className="flex items-end gap-3 border-t border-border bg-surface p-3">
+              <img
+                src="/logo.png"
+                alt="pigeonhole TA"
+                className="h-12 w-12 sm:h-14 sm:w-14 object-contain animate-float shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <ChatComposer onSend={handleSend} disabled={streaming} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <SavedNotesPanel courseId={courseId} assignments={assignments} />
+        )}
       </div>
     </div>
   );

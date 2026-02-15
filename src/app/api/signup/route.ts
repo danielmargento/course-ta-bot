@@ -21,11 +21,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Create profile row (names stored in user_metadata; profile holds role)
+  // Create profile row
   const { error: profileError } = await supabase.from("profiles").upsert({
     id: data.user.id,
     role: role || "student",
     display_name: "",
+    first_name: firstName || "",
+    last_name: lastName || "",
   });
 
   if (profileError) {

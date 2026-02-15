@@ -8,13 +8,21 @@ import "katex/dist/katex.min.css";
 import { Message } from "@/lib/types";
 import SaveToggle from "./SaveToggle";
 
+/** Convert \( ... \) → $...$ and \[ ... \] → $$...$$ so remark-math can parse them */
+function normalizeLatex(text: string): string {
+  // Display math: \[ ... \] → $$ ... $$
+  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_match, inner) => `$$${inner}$$`);
+  // Inline math: \( ... \) → $ ... $
+  text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_match, inner) => `$${inner}$`);
+  return text;
+}
+
 interface Props {
   message: Message;
   onToggleSave?: (messageId: string, saved: boolean) => void;
-  onFeedback?: (messageId: string, rating: string) => void;
 }
 
-export default function ChatMessage({ message, onToggleSave, onFeedback }: Props) {
+export default function ChatMessage({ message, onToggleSave }: Props) {
   const isUser = message.role === "user";
 
   return (
@@ -34,7 +42,7 @@ export default function ChatMessage({ message, onToggleSave, onFeedback }: Props
               remarkPlugins={[remarkMath, remarkGfm]}
               rehypePlugins={[rehypeKatex]}
             >
-              {message.content}
+              {normalizeLatex(message.content)}
             </ReactMarkdown>
           </div>
         )}
@@ -44,18 +52,6 @@ export default function ChatMessage({ message, onToggleSave, onFeedback }: Props
               saved={message.saved}
               onToggle={() => onToggleSave?.(message.id, !message.saved)}
             />
-            <button
-              onClick={() => onFeedback?.(message.id, "helpful")}
-              className="hover:text-accent transition-colors"
-            >
-              Helpful
-            </button>
-            <button
-              onClick={() => onFeedback?.(message.id, "not_helpful")}
-              className="hover:text-red-500 transition-colors"
-            >
-              Not helpful
-            </button>
           </div>
         )}
       </div>

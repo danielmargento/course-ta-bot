@@ -3,15 +3,33 @@ import { createServerClient } from "@/lib/supabaseServer";
 
 export async function GET(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get("session_id");
-  if (!sessionId) {
-    return NextResponse.json({ error: "session_id is required" }, { status: 400 });
-  }
+  const courseId = req.nextUrl.searchParams.get("course_id");
+  const saved = req.nextUrl.searchParams.get("saved");
 
   const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Fetch saved messages for a course (joined through sessions)
+  if (courseId && saved === "true") {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*, session:sessions!inner(id, assignment_id, course_id, student_id)")
+      .eq("session.course_id", courseId)
+      .eq("session.student_id", user.id)
+      .eq("saved", true)
+      .order("created_at", { ascending: true });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data);
+  }
+
+  // Fetch messages for a specific session
+  if (!sessionId) {
+    return NextResponse.json({ error: "session_id or course_id+saved is required" }, { status: 400 });
+  }
 
   // Verify user owns the session
   const { data: session } = await supabase

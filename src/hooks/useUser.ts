@@ -18,12 +18,12 @@ export function useUser() {
       if (user) {
         supabase
           .from("profiles")
-          .select("role")
+          .select("role, first_name")
           .eq("id", user.id)
           .single()
           .then(({ data }) => {
             setRole(data?.role ?? "student");
-            setFirstName(user.user_metadata?.first_name ?? null);
+            setFirstName(data?.first_name || null);
             setLoading(false);
           });
       } else {

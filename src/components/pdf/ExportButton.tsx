@@ -1,7 +1,7 @@
 "use client";
 
 import { Message } from "@/lib/types";
-import { exportMessagesToPdf } from "@/lib/pdf";
+import { printMessages } from "@/lib/pdf";
 
 interface Props {
   messages: Message[];
@@ -10,8 +10,7 @@ interface Props {
 
 export default function ExportButton({ messages, title = "Chat Export" }: Props) {
   const handleExport = () => {
-    const doc = exportMessagesToPdf(messages, title);
-    doc.save(`${title.replace(/\s+/g, "_")}.pdf`);
+    printMessages([{ groupName: title, messages }], title);
   };
 
   return (

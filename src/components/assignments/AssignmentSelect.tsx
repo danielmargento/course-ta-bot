@@ -15,7 +15,7 @@ export default function AssignmentSelect({ assignments, selected, onSelect }: Pr
       value={selected ?? ""}
       onChange={(e) => onSelect(e.target.value || null)}
     >
-      <option value="">General — no assignment</option>
+      <option value="">General</option>
       {assignments.map((a) => (
         <option key={a.id} value={a.id}>
           {a.title}

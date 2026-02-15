@@ -1,20 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Course } from "@/lib/types";
+import { Course, Announcement } from "@/lib/types";
 
 interface Props {
   course: Course;
   basePath: string;
   showClassCode?: boolean;
+  announcements?: Announcement[];
   onDelete?: (id: string) => void;
   onLeave?: (id: string) => void;
 }
 
-export default function CourseCard({ course, basePath, showClassCode, onDelete, onLeave }: Props) {
+export default function CourseCard({ course, basePath, showClassCode, announcements, onDelete, onLeave }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const unviewedCount = announcements?.filter((a) => !a.viewed).length ?? 0;
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showAnnouncements) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowAnnouncements(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showAnnouncements]);
 
   return (
     <div className="relative bg-surface border border-border rounded-lg p-5 hover:border-accent/40 hover:shadow-sm transition-all group">
@@ -39,6 +56,52 @@ export default function CourseCard({ course, basePath, showClassCode, onDelete, 
           </p>
         )}
       </Link>
+
+      {announcements && announcements.length > 0 && (
+        <div ref={dropdownRef} className="relative mt-3 pt-3 border-t border-border">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              setShowAnnouncements(!showAnnouncements);
+            }}
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-foreground transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-4 h-4"
+            >
+              <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z" />
+              <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z" />
+            </svg>
+            <span>Announcements ({announcements.length})</span>
+            {unviewedCount > 0 && (
+              <span className="bg-accent text-white px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none">
+                {unviewedCount} new
+              </span>
+            )}
+          </button>
+
+          {showAnnouncements && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              {announcements.map((a) => (
+                <div
+                  key={a.id}
+                  className={`px-3 py-2.5 text-xs border-b border-border last:border-b-0 ${
+                    a.viewed ? "text-muted" : "text-foreground bg-accent-light/50"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{a.content}</p>
+                  <span className="text-[10px] text-muted mt-1 block">
+                    {new Date(a.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {(onDelete || onLeave) && !confirming && (
         <button

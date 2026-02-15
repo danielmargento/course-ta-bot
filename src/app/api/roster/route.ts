@@ -22,17 +22,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Get enrolled students with profile info
-  const { data, error } = await supabase
+  // Get enrolled students
+  const { data: enrollments, error } = await supabase
     .from("enrollments")
-    .select("student_id, enrolled_at, profiles(first_name, last_name)")
+    .select("student_id, enrolled_at")
     .eq("course_id", courseId)
     .order("enrolled_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!enrollments || enrollments.length === 0) return NextResponse.json([]);
 
-  const roster = (data ?? []).map((e) => {
-    const p = e.profiles as unknown as { first_name: string; last_name: string } | null;
+  // Get profile info for enrolled students
+  const studentIds = enrollments.map((e) => e.student_id);
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name")
+    .in("id", studentIds);
+
+  const profileMap = new Map(
+    (profiles ?? []).map((p) => [p.id, p])
+  );
+
+  const roster = enrollments.map((e) => {
+    const p = profileMap.get(e.student_id);
     return {
       id: e.student_id,
       first_name: p?.first_name ?? "",

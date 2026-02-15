@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import CourseCard from "@/components/courses/CourseCard";
-import { Course } from "@/lib/types";
+import { Course, Announcement } from "@/lib/types";
 
 export default function StudentCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -10,6 +10,7 @@ export default function StudentCoursesPage() {
   const [classCode, setClassCode] = useState("");
   const [joinError, setJoinError] = useState("");
   const [joining, setJoining] = useState(false);
+  const [announcementsByCourse, setAnnouncementsByCourse] = useState<Record<string, Announcement[]>>({});
 
   useEffect(() => {
     fetch("/api/courses")
@@ -19,6 +20,21 @@ export default function StudentCoursesPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Fetch announcements for each course
+  useEffect(() => {
+    if (courses.length === 0) return;
+    courses.forEach((c) => {
+      fetch(`/api/announcements?course_id=${c.id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setAnnouncementsByCourse((prev) => ({ ...prev, [c.id]: data }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [courses]);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +117,7 @@ export default function StudentCoursesPage() {
               key={c.id}
               course={c}
               basePath="/student/course"
+              announcements={announcementsByCourse[c.id]}
               onLeave={async (id) => {
                 const res = await fetch(`/api/enroll?course_id=${id}`, { method: "DELETE" });
                 if (res.ok) setCourses((prev) => prev.filter((x) => x.id !== id));

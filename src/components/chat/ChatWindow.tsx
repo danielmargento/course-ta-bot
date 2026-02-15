@@ -7,10 +7,9 @@ import ChatMessage from "./ChatMessage";
 interface Props {
   messages: Message[];
   onToggleSave?: (messageId: string, saved: boolean) => void;
-  onFeedback?: (messageId: string, rating: string) => void;
 }
 
-export default function ChatWindow({ messages, onToggleSave, onFeedback }: Props) {
+export default function ChatWindow({ messages, onToggleSave }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +28,6 @@ export default function ChatWindow({ messages, onToggleSave, onFeedback }: Props
           key={msg.id}
           message={msg}
           onToggleSave={onToggleSave}
-          onFeedback={onFeedback}
         />
       ))}
       <div ref={bottomRef} />
