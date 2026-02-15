@@ -1,9 +1,6 @@
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
+import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import JSZip from "jszip";
-
-// Disable worker — we're running server-side in Node
-GlobalWorkerOptions.workerSrc = "";
 
 /**
  * Extract text content from an uploaded file buffer.
@@ -28,21 +25,8 @@ export async function extractText(
 }
 
 async function extractPdf(buffer: Buffer): Promise<string> {
-  const data = new Uint8Array(buffer);
-  const doc = await getDocument({ data, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
-  const pages: string[] = [];
-
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    const text = content.items
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((item: any) => item.str ?? "")
-      .join(" ");
-    pages.push(text);
-  }
-
-  return pages.join("\n\n");
+  const result = await pdfParse(buffer);
+  return result.text;
 }
 
 async function extractDocx(buffer: Buffer): Promise<string> {
