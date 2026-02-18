@@ -11,7 +11,7 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
-const ACCEPTED_TYPES = ".pdf,.txt,.md";
+const ACCEPTED_TYPES = ".pdf,.txt,.md,.tex";
 
 interface Props {
   courseId: string;
@@ -25,7 +25,9 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
   const [category, setCategory] = useState("other");
   const [dragOver, setDragOver] = useState(false);
   const [reextracting, setReextracting] = useState<string | null>(null);
+  const [texFile, setTexFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const texInputRef = useRef<HTMLInputElement>(null);
 
   const handleReextract = async (materialId: string) => {
     setReextracting(materialId);
@@ -67,6 +69,9 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
         formData.append("file", file);
         formData.append("course_id", courseId);
         formData.append("category", category);
+        if (texFile && file.name.toLowerCase().endsWith(".pdf")) {
+          formData.append("tex_file", texFile);
+        }
 
         const res = await fetch("/api/materials", {
           method: "POST",
@@ -87,7 +92,9 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
       setError(`Upload error: ${e instanceof Error ? e.message : "unknown error"}`);
     } finally {
       setUploading(false);
+      setTexFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      if (texInputRef.current) texInputRef.current.value = "";
     }
   };
 
@@ -151,9 +158,35 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
                 Drop files here or click to upload
               </p>
               <p className="text-xs text-muted mt-1">
-                PDF, TXT, MD
+                PDF, TXT, MD, TEX
               </p>
             </>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-center gap-3">
+          <label className="text-xs text-muted cursor-pointer hover:text-foreground transition-colors">
+            <input
+              ref={texInputRef}
+              type="file"
+              accept=".tex"
+              onChange={(e) => setTexFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+            <span className="border border-border rounded px-2.5 py-1.5 inline-block">
+              {texFile ? texFile.name : "Attach LaTeX source (.tex)"}
+            </span>
+          </label>
+          {texFile && (
+            <button
+              onClick={() => { setTexFile(null); if (texInputRef.current) texInputRef.current.value = ""; }}
+              className="text-xs text-muted hover:text-red-500 transition-colors"
+            >
+              Remove
+            </button>
+          )}
+          {!texFile && (
+            <span className="text-[10px] text-muted">Optional — improves equation extraction for PDFs</span>
           )}
         </div>
 

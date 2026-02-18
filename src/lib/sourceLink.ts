@@ -6,7 +6,8 @@ export interface SourceLink {
   page: number | null;
 }
 
-const SOURCE_REGEX = /\[SOURCE:([^:\]]+):([^\]]+)\]([^\[]*)\[\/SOURCE\]/g;
+// Match both [SOURCE:id:label]text[/SOURCE] and unclosed [SOURCE:id:label]text
+const SOURCE_REGEX = /\[SOURCE:([^:\]]+):([^\]]+)\]([\s\S]*?)(?:\[\/SOURCE\]|(?=\[SOURCE:)|$)/g;
 const PAGE_REGEX = /Page\s+(\d+)/i;
 
 export interface ParsedSourceContent {

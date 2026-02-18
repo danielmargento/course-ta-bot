@@ -9,7 +9,7 @@ import { Message } from "@/lib/types";
 import SaveToggle from "./SaveToggle";
 import ConceptCheckCard from "./ConceptCheckCard";
 import { parseConceptCheck, hasPartialConceptCheck } from "@/lib/conceptCheck";
-import { parseSourceLinks, hasPartialSourceTag } from "@/lib/sourceLink";
+import { parseSourceLinks } from "@/lib/sourceLink";
 
 /** Convert \( ... \) → $...$ and \[ ... \] → $$...$$ so remark-math can parse them */
 function normalizeLatex(text: string): string {
@@ -56,13 +56,12 @@ export default function ChatMessage({
 
   // Parse source links — convert [SOURCE:...] tags to markdown links
   if (!isUser) {
-    if (hasPartialSourceTag(displayContent)) {
-      // Hide incomplete source tag during streaming
+    // Hide a truly incomplete tag mid-stream (opening bracket not yet closed)
+    if (/\[SOURCE:[^\]]*$/.test(displayContent)) {
       displayContent = displayContent.replace(/\[SOURCE:[^\]]*$/, "").trim();
-    } else {
-      const { cleanContent: withLinks } = parseSourceLinks(displayContent);
-      displayContent = withLinks;
     }
+    const { cleanContent: withLinks } = parseSourceLinks(displayContent);
+    displayContent = withLinks;
   }
 
   return (

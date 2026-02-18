@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
-import { extractText, getFileType } from "@/lib/fileParse";
+import { extractText, extractChunks, getFileType } from "@/lib/fileParse";
+import { generateEmbeddings } from "@/lib/embeddings";
+import { generateSummary } from "@/lib/summarize";
 
 export async function GET(req: NextRequest) {
   const courseId = req.nextUrl.searchParams.get("course_id");
@@ -39,6 +41,7 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File | null;
   const courseId = formData.get("course_id") as string | null;
   const category = (formData.get("category") as string) || "other";
+  const texFile = formData.get("tex_file") as File | null;
 
   if (!file || !courseId) {
     return NextResponse.json({ error: "file and course_id are required" }, { status: 400 });
@@ -61,14 +64,20 @@ export async function POST(req: NextRequest) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // Extract text
+  // Extract text — use .tex companion if provided, otherwise extract from the file itself
   let extractedText = "";
+  const hasTexCompanion = texFile && fileType === "pdf";
+  const extractionSource = hasTexCompanion ? "tex" : fileType;
+  const extractionBuffer = hasTexCompanion
+    ? Buffer.from(await texFile.arrayBuffer())
+    : buffer;
+
   try {
-    extractedText = await extractText(buffer, fileType);
+    extractedText = await extractText(extractionBuffer, extractionSource);
     if (!extractedText) {
       console.warn(`Text extraction returned empty for ${file.name}`);
     } else {
-      console.log(`Extracted ${extractedText.length} chars from ${file.name}`);
+      console.log(`Extracted ${extractedText.length} chars from ${file.name}${hasTexCompanion ? " (via .tex companion)" : ""}`);
     }
   } catch (e) {
     console.error(`Text extraction failed for ${file.name}:`, e);
@@ -110,6 +119,52 @@ export async function POST(req: NextRequest) {
     // Clean up uploaded file if DB insert fails
     await supabase.storage.from("course-materials").remove([storagePath]);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // RAG processing: extract chunks, generate summary & embeddings, store
+  // Non-fatal — upload succeeds even if RAG processing fails
+  try {
+    const chunks = await extractChunks(extractionBuffer, extractionSource);
+    console.log(`[rag] Extracted ${chunks.length} chunks from ${file.name}`);
+
+    if (chunks.length > 0) {
+      // Generate summary and embeddings in parallel
+      const [summary, embeddings] = await Promise.all([
+        generateSummary(extractedText, file.name),
+        generateEmbeddings(chunks.map((c) => c.content)),
+      ]);
+
+      // Store summary on course_materials row
+      if (summary) {
+        await supabase
+          .from("course_materials")
+          .update({ summary })
+          .eq("id", materialId);
+      }
+
+      // Bulk insert chunks with embeddings
+      const chunkRows = chunks.map((chunk, i) => ({
+        material_id: materialId,
+        course_id: courseId,
+        chunk_index: i,
+        content: chunk.content,
+        source_label: chunk.source_label,
+        metadata: chunk.metadata,
+        embedding: JSON.stringify(embeddings[i]),
+      }));
+
+      const { error: chunkError } = await supabase
+        .from("material_chunks")
+        .insert(chunkRows);
+
+      if (chunkError) {
+        console.error(`[rag] Failed to insert chunks for ${file.name}:`, chunkError);
+      } else {
+        console.log(`[rag] Stored ${chunkRows.length} chunks with embeddings for ${file.name}`);
+      }
+    }
+  } catch (ragError) {
+    console.error(`[rag] RAG processing failed for ${file.name}:`, ragError);
   }
 
   return NextResponse.json(data, { status: 201 });

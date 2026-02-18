@@ -36,7 +36,28 @@ export interface CourseMaterial {
   category: string;
   storage_path: string;
   extracted_text?: string;
+  summary?: string;
   created_at: string;
+}
+
+export interface ParsedChunk {
+  content: string;
+  source_label: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface RetrievedChunk {
+  id: string;
+  material_id: string;
+  course_id: string;
+  chunk_index: number;
+  content: string;
+  source_label: string;
+  metadata: Record<string, unknown>;
+  similarity: number;
+  file_name: string;
+  file_type: string;
+  category: string;
 }
 
 export interface BotConfig {
